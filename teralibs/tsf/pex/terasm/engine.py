@@ -125,21 +125,21 @@ TA_SYM_RESOLVER = CFUNCTYPE(c_bool, c_char_p, POINTER(c_uint64))
 
 def lib_version():
     """Return (major, minor, combined) from the loaded libkeystone.so."""
-    if _LIB:
-        major = c_int()
-        minor = c_int()
-        combined = _LIB.ks_version(byref(major), byref(minor))
-        return (major.value, minor.value, combined)
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    major = c_int()
+    minor = c_int()
+    combined = _LIB.ks_version(byref(major), byref(minor))
+    return (major.value, minor.value, combined)
 
 
 def arch_supported(arch):
     """Return True if the loaded library was compiled with support for arch."""
-    if _LIB:
-        return bool(_LIB.ks_arch_supported(arch))
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    return bool(_LIB.ks_arch_supported(arch))
 
 
 # Low-level handle operations (used by Assembler - not public API)
@@ -151,52 +151,52 @@ def open_engine(arch, mode):
     Returns the opaque handle (c_void_p).
     Raises TerasmError on failure.
     """
-    if _LIB:
-        handle = _ksengine()
-        status = _LIB.ks_open(arch, mode, byref(handle))
-        if status != TA_ERR_OK:
-            raise TerasmError(status)
-        return handle
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    handle = _ksengine()
+    status = _LIB.ks_open(arch, mode, byref(handle))
+    if status != TA_ERR_OK:
+        raise TerasmError(status)
+    return handle
 
 
 def close_engine(handle):
     """Close a keystone engine handle. Silent on error (destructor context)."""
-    if _LIB:
-        with contextlib.suppress(Exception):
-            _LIB.ks_close(handle)
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    with contextlib.suppress(Exception):
+        _LIB.ks_close(handle)
 
 
 def set_option(handle, opt, value):
     """Apply an engine option. Raises TerasmError on failure."""
-    if _LIB:
-        status = _LIB.ks_option(handle, opt, value)
-        if status != TA_ERR_OK:
-            raise TerasmError(status)
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    status = _LIB.ks_option(handle, opt, value)
+    if status != TA_ERR_OK:
+        raise TerasmError(status)
 
 
 def strerror(errno):
     """Return the human-readable string for an error code."""
-    if _LIB:
-        msg = _LIB.ks_strerror(errno)
-        if isinstance(msg, bytes):
-            return msg.decode("utf-8")
-        return msg
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    msg = _LIB.ks_strerror(errno)
+    if isinstance(msg, bytes):
+        return msg.decode("utf-8")
+    return msg
 
 
 def get_errno(handle):
     """Return the last error code recorded on this engine handle."""
-    if _LIB:
-        return _LIB.ks_errno(handle)
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    return _LIB.ks_errno(handle)
 
 
 def assemble_raw(handle, source_bytes, addr):
@@ -205,29 +205,29 @@ def assemble_raw(handle, source_bytes, addr):
     Raises TerasmError on failure.
     Returns (None, 0) when no instructions were assembled.
     """
-    if _LIB:
-        encode = POINTER(c_ubyte)()
-        encode_size = c_size_t()
-        stat_count = c_size_t()
+    if _LIB is None:
+        raise RuntimeError("terasm: keystone library failed to load.")
 
-        status = _LIB.ks_asm(
-            handle,
-            source_bytes,
-            addr,
-            byref(encode),
-            byref(encode_size),
-            byref(stat_count),
-        )
+    encode = POINTER(c_ubyte)()
+    encode_size = c_size_t()
+    stat_count = c_size_t()
 
-        if status != 0:
-            errno = _LIB.ks_errno(handle)
-            raise TerasmError(errno, stat_count.value)
+    status = _LIB.ks_asm(
+        handle,
+        source_bytes,
+        addr,
+        byref(encode),
+        byref(encode_size),
+        byref(stat_count),
+    )
 
-        if stat_count.value == 0:
-            return (None, 0)
+    if status != 0:
+        errno = _LIB.ks_errno(handle)
+        raise TerasmError(errno, stat_count.value)
 
-        raw = bytes(bytearray(encode[i] for i in range(encode_size.value)))
-        _LIB.ks_free(encode)
-        return (raw, stat_count.value)
+    if stat_count.value == 0:
+        return (None, 0)
 
-    raise RuntimeError("terasm: keystone library failed to load.")
+    raw = bytes(bytearray(encode[i] for i in range(encode_size.value)))
+    _LIB.ks_free(encode)
+    return (raw, stat_count.value)
