@@ -1,0 +1,58 @@
+# ==============================================================================
+# Python Bytecode and Runtime Cache (Enforced via sys.dont_write_bytecode)
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyright_cache/
+.ruff_cache/
+__init__.py
+
+# ==============================================================================
+# Development Environment & Isolated Testing Directories
+# ==============================================================================
+.venv/
+venv/
+ENV/
+env/
+
+# ==============================================================================
+# Modern Packaging Engine Intermediates (Hatch / Build Outputs)
+# ==============================================================================
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==============================================================================
+# Framework Local Runtime & Dynamic Logs
+# ==============================================================================
+*.log
+.history/
+.terasploit_history
+
+# ==============================================================================
+# Operating System & IDE Configurations
+# ==============================================================================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+# Session persistence files - contain target IPs and engagement data
+session/

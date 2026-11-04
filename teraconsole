@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+
+
+# Never write __pycache__ into the source tree.
+sys.dont_write_bytecode = True
+
+# Ensure the framework root is on sys.path whether this runs as a
+# direct script or via the pip-generated console_scripts shim.
+ROOT = str(Path(__file__).resolve().parent)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+try:
+    # Import the main console entry point inside a try block
+    # to catch KeyboardInterrupt and exit gracefully.
+    from teralibs.terasploit.framework.console.tsf import main as terasploit_console
+
+
+except KeyboardInterrupt:
+    # Gracefully handle Ctrl+C at the top level to avoid raw tracebacks
+    print("\n[*] Interrupted, quitting Terasploit framework console...")
+    sys.exit(0)
+
+
+def main() -> None:
+    """Entry point for installers and direct script execution."""
+    try:
+        terasploit_console()
+
+    except KeyboardInterrupt:
+        print("\n[*] Interrupted, quitting Terasploit framework console...")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
