@@ -1,5 +1,15 @@
 import struct
+from collections.abc import Callable, Mapping
 from typing import Any
+
+
+_NUMERIC_FORMATS: Mapping[str, str] = {
+    "uint8": "<B",
+    "uint16v": "<H",
+    "uint16n": ">H",
+    "uint32v": "<I",
+    "uint32n": ">I",
+}
 
 
 class CStructInstance:
@@ -10,11 +20,15 @@ class CStructInstance:
         self._restraints = restraints
         self._values = values or {}
 
-        # Initialize default values from the layout definition
         for field in self._fields_def:
             f_name = field[1]
             if f_name not in self._values:
-                self._values[f_name] = field[2] if len(field) > 2 else None
+                # Auto-instantiate template defaults so construction mirrors parse behavior.
+                # Storing a bare CStructTemplate would make field access and to_bytes() fail.
+                if field[0] == "template" and len(field) > 2 and isinstance(field[2], CStructTemplate):
+                    self._values[f_name] = field[2].make_struct()
+                else:
+                    self._values[f_name] = field[2] if len(field) > 2 else None
 
     def __getattr__(self, name: str) -> Any:
         """Allows accessing fields via attribute syntax: pkt.Type"""
@@ -72,6 +86,8 @@ class CStructInstance:
                         inner_payload = inner_template.to_bytes(payload)
                     elif isinstance(inner_template, bytes):
                         inner_payload = inner_template  # Direct pass-through
+                    elif isinstance(inner_template, CStructTemplate):
+                        inner_payload = inner_template(**kwargs).to_bytes(payload)
                     elif callable(inner_template):
                         result = inner_template(payload, **kwargs)
                         if isinstance(result, bytes):
@@ -91,27 +107,91 @@ class CStructInstance:
                 if source_field == "Payload" and isinstance(inner_payload, bytes):
                     kwargs[target_field] = len(inner_payload)
 
+    def from_s(self, data: bytes):
+        """
+        Parses a raw buffer into this instance, overwriting its field values.
+
+        Trailing bytes beyond the last field are ignored. Raises ValueError on a
+        truncated buffer and NotImplementedError on an unsupported field type.
+        """
+        self.parse_from(bytes(data), 0)
+        return self
+
+    def parse_from(self, data: bytes, offset: int) -> int:
+        """Parses fields starting at offset and returns the offset after the last one."""
+        parsed: set[str] = set()
+
+        for field in self._fields_def:
+            f_type, f_name = field[0], field[1]
+
+            if f_type in _NUMERIC_FORMATS:
+                fmt = _NUMERIC_FORMATS[f_type]
+                size = struct.calcsize(fmt)
+                self._require(data, offset, size, f_name)
+                self._values[f_name] = struct.unpack_from(fmt, data, offset)[0]
+                offset += size
+            elif f_type == "template" and f_name != "Payload":
+                nested = field[2].make_struct()
+                offset = nested.parse_from(data, offset)
+                self._values[f_name] = nested
+            elif f_type in ("string", "template"):
+                size = self._resolve_size(field, parsed, len(data) - offset)
+                self._require(data, offset, size, f_name)
+                self._values[f_name] = data[offset : offset + size]
+                offset += size
+            else:
+                raise NotImplementedError(f"Field '{f_name}': unsupported type '{f_type}'")
+
+            parsed.add(f_name)
+        return offset
+
+    def _size_sources(self) -> dict[str, tuple[str, Any]]:
+        """Maps each bidirectional restraint source to (size field, optional adjust callable)."""
+        return {r[0]: (r[1], r[2]) for r in self._restraints if len(r) >= 4 and r[3]}
+
+    def _resolve_size(self, field: list, parsed: set[str], remaining: int) -> int:
+        """
+        Size resolution order: explicit fixed size, restraint size field,
+        remainder of the buffer (last field only), otherwise zero.
+        """
+        f_type, f_name = field[0], field[1]
+        fixed = field[2] if len(field) > 2 else None
+        if f_type == "string" and isinstance(fixed, int):
+            return fixed
+
+        size_sources = self._size_sources()
+        if f_name in size_sources:
+            size_field, adjust = size_sources[f_name]
+            if size_field not in parsed:
+                raise ValueError(f"Field '{f_name}' is sized by '{size_field}', which is defined after it")
+
+            size = self._values[size_field]
+            if isinstance(adjust, Callable):
+                return adjust(size)
+
+            return size
+
+        return remaining if field is self._fields_def[-1] else 0
+
+    @staticmethod
+    def _require(data: bytes, offset: int, size: int, name: str) -> None:
+        available = len(data) - offset
+        if size > available:
+            raise ValueError(f"Truncated buffer: field '{name}' needs {size} bytes at offset {offset}, {available} available")
+
     def _serialize_fields(self, kwargs: dict, inner_payload: bytes) -> bytes:
         """
         Iterates over the field definitions to pack numeric primitives, templates,
         and strings into a concrete byte stream.
         """
-        type_map = {
-            "uint8": ("B", "<"),
-            "uint16v": ("H", "<"),
-            "uint16n": ("H", ">"),
-            "uint32v": ("I", "<"),
-            "uint32n": ("I", ">"),
-        }
         packed_bytes = b""
 
         for field in self._fields_def:
             f_type, f_name = field[0], field[1]
             val = kwargs.get(f_name)
 
-            if f_type in type_map:
-                fmt_char, endian = type_map[f_type]
-                packed_bytes += struct.pack(f"{endian}{fmt_char}", val)
+            if f_type in _NUMERIC_FORMATS:
+                packed_bytes += struct.pack(_NUMERIC_FORMATS[f_type], val)
 
             elif f_type == "template":
                 if f_name == "Payload":
