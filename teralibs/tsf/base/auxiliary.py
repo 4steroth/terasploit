@@ -142,7 +142,7 @@ class Auxiliary(Base):
     DESCRIPTION: str
 
     #: Author handle or contact information.
-    AUTHOR: str
+    AUTHOR: Sequence
 
     #: SPDX license identifier, e.g. "BSD-3-CLAUSE".
     LICENSE: str = "BSD-3-CLAUSE"
