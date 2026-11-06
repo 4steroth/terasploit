@@ -98,6 +98,8 @@ class ConsoleRenderer(Terasploit):
             # Check first if these will return anything, if not we don't give the reminder.
             if sub == "evasion" and not self.datastore.definitions("module_evasion"):
                 return
+            if sub == "advanced" and not self.datastore.definitions("module_advanced"):
+                return
             if sub == "modes" and not getattr(entry.module, "AUXILIARY_MODE", None):
                 return
             if sub == "targets" and not getattr(entry.module, "TARGET", None):
@@ -214,7 +216,6 @@ class ConsoleRenderer(Terasploit):
         if defs:
             tbl.options_table(title, defs, vals)
         else:
-            print_line()
             info(f"No advanced options for {_to_path(name)}.")
 
     def show_payload_advanced(self):
