@@ -165,8 +165,6 @@ class TerasploitModule(Auxiliary):
         smb_name = ctx.get_option("SMBName")
         rhost = ctx.get_option("RHOST")
         rport = int(ctx.get_option("RPORT"))
-        if rport != 445:
-            raise RuntimeError(f"Remote port is set to: {rport}, port 445 is required.")
 
         # We force the connection wrapper to ONLY negotiate legacy SMB1
         conn = SMBConnection(smb_name, rhost, sess_port=rport, preferredDialect=SMB_DIALECT)
