@@ -1,3 +1,5 @@
+import contextlib
+import os
 from collections.abc import Sequence
 
 from impacket.smbconnection import SMB_DIALECT, SMBConnection
@@ -42,13 +44,24 @@ class TerasploitModule(Auxiliary):
     OPTIONS: Sequence = ["RHOST", ("RPORT", {"default": 445})]
 
     def __init__(self):
+        self.named_pipes = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
+            "data",
+            "wordlists",
+            "named_pipes.txt",
+        )
         self.register_options(
             [
-                self.opt("CHECK_ARCH", True, True, "Check for DOUBLEPULSAR on vulnerable hosts", self.otype.BOOL),
-                self.opt("SMBDomain", ".", True, "The Windows domain to use for authentication", self.otype.STRING),
+                self.opt("SMBDomain", ".", False, "The Windows domain to use for authentication", self.otype.STRING),
                 self.opt("SMBName", "*SMBSERVER", True, "The NetBIOS hostname (required for port 139 connections)", self.otype.STRING),
-                self.opt("SMBUser", "", True, "The username to authenticate as", self.otype.STRING),
-                self.opt("SMBPass", "", True, "The password for the specified username", self.otype.STRING),
+                self.opt("SMBUser", "", False, "The username to authenticate as", self.otype.STRING),
+                self.opt("SMBPass", "", False, "The password for the specified username", self.otype.STRING),
+            ]
+        )
+        self.register_advanced_options(
+            [
+                self.opt("CHECK_PIPES", True, True, "Check for named pipe on vulnerable hosts", self.otype.BOOL),
+                self.opt("NAMED_PIPES", self.named_pipes, True, "List of named pipes to check", self.otype.PATH),
             ]
         )
 
@@ -71,13 +84,42 @@ class TerasploitModule(Auxiliary):
 
         return "x64 (64-bit)"
 
+    def check_pipes_on_vuln_host(self, ctx, conn, tree_id):
+        """Scan for pipes on host vulnerable to MS17-010."""
+
+        pipes = None
+        with contextlib.suppress(Exception), open(self.named_pipes, encoding="utf-8", errors="ignore") as f:
+            pipes = [x.strip() for x in f.readlines()]
+
+        if not pipes:
+            ctx.error(f"Could not open {self.named_pipes}")
+            return
+
+        # Scan for pipes
+        ctx.info("Scanning for named pipes...")
+        for pipe in pipes:
+            with contextlib.suppress(Exception):
+                pipe_path = f"\\{pipe}"
+                fid = conn.createFile(treeId=tree_id, pathName=pipe_path, desiredAccess=0x00020089)
+
+                # If it did not raise an exception, it's accessible.
+                ctx.success(f"{ctx.get_option('RHOST')} - '{pipe_path}' pipe exists and accessible!")
+                # Cleanup
+                conn.closeFile(tree_id, fid)
+
     def run(self, ctx):
         """Scan for the presence of DoublePulsar from NSA."""
         ip = ctx.get_option("RHOST")
         ipc_share = f"\\\\{ip}\\IPC$"
 
         # Get the tree id
-        conn, tree_id, uid = self.do_smb_setup_tree(ctx, ipc_share)
+        try:
+            conn, tree_id, uid = self.do_smb_setup_tree(ctx, ipc_share)
+
+        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+            ctx.error(f"Error: {exc}")
+            return
+
         ctx.info(f"Connected to {ipc_share} with TID = {tree_id}")
         try:
             status = self.do_smb_ms17_010_probe(tree_id, uid, conn)
@@ -85,7 +127,7 @@ class TerasploitModule(Auxiliary):
 
             # Check arch
             arch = None
-            if status == "STATUS_INSUFF_SERVER_RESOURCES" and ctx.get_option("CHECK_ARCH"):
+            if status == "STATUS_INSUFF_SERVER_RESOURCES":
                 arch = Client.dcerpc_getarch(ip)
 
             os_name = conn.getServerOS()
@@ -104,12 +146,16 @@ class TerasploitModule(Auxiliary):
             else:
                 ctx.info(f"The host {ip} is likely not infected with doublepulsar")
 
+            if ctx.get_option("CHECK_PIPES"):
+                self.check_pipes_on_vuln_host(ctx, conn, tree_id)
+
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
-            ctx.info(f"Error: {exc}")
+            ctx.error(f"Error: {exc}")
 
         finally:
-            conn.logoff()
-            conn.close()
+            with contextlib.suppress(Exception):
+                conn.logoff()
+                conn.close()
 
     def do_smb_setup_tree(self, ctx, ipc_share):
         """
