@@ -9,7 +9,7 @@ from teralibs.tsf.pex.smb.exception import ErrorCode
 
 
 class TerasploitModule(Auxiliary):
-    """Detects the presence of DoublePulsar in Windows System."""
+    """Detects MS17-010 vulnerabillity and the presence of DoublePulsar in Windows System."""
 
     NAME: str = "MS17-010 DoublePulsar Detection "
     DESCRIPTION: str = (
