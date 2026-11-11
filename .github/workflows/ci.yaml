@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+
+  # Job 1: Lint and format check
+  #
+  # Runs ruff over the full include surface defined in pyproject.toml.
+  # No framework imports are needed — ruff is purely syntactic.
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Check lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+  # Job 2: Type checking
+  #
+  # Runs pyright in standard mode as configured in pyproject.toml.
+  # The framework is installed in editable mode so pyright can resolve
+  # `from teralibs.x import y` without sys.path hacks.
+
+  typecheck:
+    name: Type check (pyright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install framework and dependencies
+        run: pip install -e . --break-system-packages || pip install -e .
+
+      - name: Install pyright
+        run: pip install pyright
+
+      - name: Run type check
+        run: pyright

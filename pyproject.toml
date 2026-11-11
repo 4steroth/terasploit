@@ -1,0 +1,87 @@
+# Build System Configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["teralibs"]
+
+
+# Project Core Metadata & Dynamic Entry Points
+[project]
+name = "terasploit-framework"
+version = "1.0.0-dev.1"
+description = "Exploitation Framework for Cross-Platform Red Team Operations"
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [
+    { name = "4steroth", email = "asteroth.git@gmail.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3.14",
+    "Environment :: Console",
+    "Topic :: Security",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = ["impacket", "paramiko"]
+
+
+# Script Distribution (PEP 517 Console Entry Points)
+[project.scripts]
+teraconsole = "teralibs.terasploit.framework.console.tsf:main"
+terax = "teralibs.tsf.terax.generator:main"
+
+
+# Global Ruff Settings
+[tool.ruff]
+target-version = "py314"
+line-length = 150
+include = ["teraconsole", "terax", "teralibs/**/*.py", "modules/**/*.py"]
+
+
+# Ruff Linting Rules
+[tool.ruff.lint]
+select = ["E", "W", "I", "UP", "B", "SIM", "RUF", "F",]
+
+
+# Ruff Plugin Tooling & Advanced Aesthetics
+[tool.ruff.lint.isort]
+known-first-party = ["libs", "modules"]
+lines-after-imports = 2
+combine-as-imports  = true
+
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+
+# Ruff Formatter Settings
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+docstring-code-line-length = 80
+
+
+# Pyright Type Checker Settings
+[tool.pyright]
+pythonVersion = "3.14"
+extraPaths = ["."]
+include    = ["teralibs/**/*.py", "modules**/*.py"]
+typeCheckingMode = "standard"
+
+# Pylint Format
+[tool.pylint.format]
+max-line-length = 150
+
+# Legacy Pylint Message Controls
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0302",  # too-many-lines
+
+    # Intentional for framework design
+    "R0902",  # too-many-instance-attributes
+    "R0904",  # too-many-public-methods
+]

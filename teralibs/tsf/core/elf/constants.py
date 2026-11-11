@@ -1,0 +1,49 @@
+# ELF Header Sizes
+ELF32_HEADER_SIZE = 52
+ELF32_PHDR_SIZE = 32
+
+ELF64_HEADER_SIZE = 64
+ELF64_PHDR_SIZE = 56
+
+# ELF Type
+ET_EXEC = 2
+
+# ELF Version
+EV_CURRENT = 1
+
+# Machine Architecture Identifiers
+EM_386 = 3
+EM_X86_64 = 62
+EM_AARCH64 = 183
+
+# Load Virtual Addresses
+LOAD_VADDR_X86 = 0x08048000
+LOAD_VADDR_X64 = 0x400000
+LOAD_VADDR_ARM64 = 0x400000
+
+# Segment Alignment
+ALIGN_X86 = 0x1000
+ALIGN_X64 = 0x200000
+ALIGN_ARM64 = 0x10000
+
+# Program Header Type
+PT_LOAD = 1
+
+# Program Header Flags
+PF_X = 0x1
+PF_W = 0x2
+PF_R = 0x4
+PF_RWX = PF_R | PF_W | PF_X
+
+# ELF Magic
+ELFMAG = b"\x7fELF"
+
+# ELF Class
+ELFCLASS32 = 0x01
+ELFCLASS64 = 0x02
+
+# ELF Data Encoding
+ELFDATA2LSB = 0x01
+
+# ELF OS/ABI
+ELFOSABI_NONE = 0x00

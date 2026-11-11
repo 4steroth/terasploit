@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Report a security vulnerability
+    url: mailto:asteroth.git@gmail.com
+    about: Do not open a public issue for security vulnerabilities. Email us directly — see SECURITY.md.
+  - name: Architecture discussion
+    url: https://github.com/4steroth/terasploit/discussions
+    about: For questions about framework architecture or design direction, open a discussion instead.
