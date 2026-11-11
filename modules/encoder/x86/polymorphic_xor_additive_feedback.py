@@ -10,17 +10,17 @@ from teralibs.tsf.pex.poly import EncodingError, LogicalBlock, LogicalRegisterX8
 
 # Groups the three register references that every block-building helper needs,
 # avoiding wide argument lists across the private helpers below.
-ShikataRegs = namedtuple("ShikataRegs", ["addr", "key", "endb"])
+PolymorphicRegs = namedtuple("PolymorphicRegs", ["addr", "key", "endb"])
 
 
 class TerasploitModule(XorAdditiveFeedback):
     """x86 polymorphic XOR additive-feedback encoder."""
 
-    NAME: str = "x86 Shikata Ga Nai"
+    NAME: str = "x86 Polymorphic XOR Additive Feedback"
     DESCRIPTION: str = (
         "This encoder implements a polymorphic XOR additive feedback encoder. "
         "The decoder stub is generated based on dynamic instruction "
-        "substitution and dynamic block ordering.  Registers are also "
+        "substitution and dynamic block ordering. Registers are also "
         "EncoderRankselected dynamically. "
     )
     AUTHOR: Sequence = ["spoonm - original msf", "4steroth - terasploit implementation"]
@@ -51,11 +51,11 @@ class TerasploitModule(XorAdditiveFeedback):
         """Pack a little-endian unsigned 32-bit integer."""
         return struct.pack("<I", value & 0xFFFFFFFF)
 
-    def _xor_inst(self, b, regs: ShikataRegs) -> bytes:
+    def _xor_inst(self, b, regs: PolymorphicRegs) -> bytes:
         """XOR r/m32, r32 ModRM encoding for the addr and key registers."""
         return b"\x31" + self._pack_byte(0x40 + b.regnum_of(regs.addr) + (8 * b.regnum_of(regs.key)))
 
-    def _add_inst(self, b, regs: ShikataRegs) -> bytes:
+    def _add_inst(self, b, regs: PolymorphicRegs) -> bytes:
         """ADD r32, r/m32 ModRM encoding for the addr and key registers."""
         return b"\x03" + self._pack_byte(0x40 + b.regnum_of(regs.addr) + (8 * b.regnum_of(regs.key)))
 
@@ -76,7 +76,7 @@ class TerasploitModule(XorAdditiveFeedback):
 
         return init_counter
 
-    def _build_init_key(self, state, regs: ShikataRegs) -> LogicalBlock:
+    def _build_init_key(self, state, regs: PolymorphicRegs) -> LogicalBlock:
         """Build the init_key block for context or direct key encoding."""
         opcode = 0xA1 if state.context_encoding else 0xB8
         return LogicalBlock(
@@ -84,7 +84,7 @@ class TerasploitModule(XorAdditiveFeedback):
             lambda b: self._pack_byte(opcode + b.regnum_of(regs.key)) + b"XORK",
         )
 
-    def _build_buffer_getpc(self, state, regs: ShikataRegs) -> LogicalBlock:
+    def _build_buffer_getpc(self, state, regs: PolymorphicRegs) -> LogicalBlock:
         """Build the getpc block using the configured BufferRegister."""
         buff_reg = LogicalRegisterX86("buff", self.DATASTORE["BufferRegister"])
         offset = int(self.DATASTORE["BufferOffset"]) if self.DATASTORE["BufferOffset"] else 0
@@ -124,7 +124,7 @@ class TerasploitModule(XorAdditiveFeedback):
         getpc.add_perm(lea)
         return getpc
 
-    def _build_buffer_math_ops(self, regs: ShikataRegs, cutoff) -> tuple:
+    def _build_buffer_math_ops(self, regs: PolymorphicRegs, cutoff) -> tuple:
         """Return the four math offset ops for BufferRegister addressing mode."""
 
         def xor1(b):
@@ -145,7 +145,7 @@ class TerasploitModule(XorAdditiveFeedback):
 
         return xor1, xor2, add1, add2
 
-    def _build_fpu_getpc(self, regs: ShikataRegs) -> tuple:
+    def _build_fpu_getpc(self, regs: PolymorphicRegs) -> tuple:
         """Build the FPU-based getpc block; returns (getpc, fpu)."""
         fpu = LogicalBlock("fpu", *self.fpu_instructions())
         fnstenv = LogicalBlock("fnstenv", b"\xd9\x74\x24\xf4")
@@ -155,7 +155,7 @@ class TerasploitModule(XorAdditiveFeedback):
         getpc.depends_on(fnstenv)
         return getpc, fpu
 
-    def _build_fpu_math_ops(self, regs: ShikataRegs, cutoff, fpu) -> tuple:
+    def _build_fpu_math_ops(self, regs: PolymorphicRegs, cutoff, fpu) -> tuple:
         """Return the four math offset ops for FPU addressing mode."""
 
         def xor1(b):
@@ -176,7 +176,7 @@ class TerasploitModule(XorAdditiveFeedback):
 
         return xor1, xor2, add1, add2
 
-    def _build_getpc_and_math(self, state, regs: ShikataRegs, cutoff) -> tuple:
+    def _build_getpc_and_math(self, state, regs: PolymorphicRegs, cutoff) -> tuple:
         """Select addressing mode and return (getpc, math_ops)."""
         if self.DATASTORE["BufferRegister"]:
             getpc = self._build_buffer_getpc(state, regs)
@@ -187,7 +187,7 @@ class TerasploitModule(XorAdditiveFeedback):
         math_ops = self._build_fpu_math_ops(regs, cutoff, fpu)
         return getpc, math_ops
 
-    def _assemble_loop(self, regs: ShikataRegs, math_ops) -> tuple:
+    def _assemble_loop(self, regs: PolymorphicRegs, math_ops) -> tuple:
         """Build loop_block permutations and loop_inst from math_ops."""
         xor1, xor2, add1, add2 = math_ops
 
@@ -212,10 +212,10 @@ class TerasploitModule(XorAdditiveFeedback):
         loop_inst = LogicalBlock("loop_inst", b"\xe2\xf5")
         return loop_block, loop_inst
 
-    def generate_shikata_block(self, state, length, cutoff):
-        """Generate a polymorphic Shikata decoder block."""
+    def generate_polymorphic_block(self, state, length, cutoff):
+        """Generate a polymorphic decoder block."""
         _count_reg = LogicalRegisterX86("count", "ecx")
-        regs = ShikataRegs(
+        regs = PolymorphicRegs(
             addr=LogicalRegisterX86("addr"),
             key=LogicalRegisterX86("key", "eax") if state.context_encoding else LogicalRegisterX86("key"),
             endb=SymbolicBlock.End(),
@@ -239,7 +239,7 @@ class TerasploitModule(XorAdditiveFeedback):
             raise EncodingError(str(exc)) from exc
 
     def decoder_stub(self, state):
-        """Generate and cache the Shikata decoder stub for the given state."""
+        """Generate and cache the polymorphic decoder stub for the given state."""
         if state.decoder_stub is not None:
             return state.decoder_stub
 
@@ -247,10 +247,10 @@ class TerasploitModule(XorAdditiveFeedback):
             raise EncoderError("Saved registers overlap with registers modified by the encoder.")
 
         cutoff = 4 - (len(state.buf) & 3)
-        block = self.generate_shikata_block(state, len(state.buf) + cutoff, cutoff)
+        block = self.generate_polymorphic_block(state, len(state.buf) + cutoff, cutoff)
 
         if block is None:
-            raise EncoderError("Failed to generate the Shikata decoder stub.")
+            raise EncoderError("Failed to generate the polymorphic xor additive feedback decoder stub.")
 
         state.decoder_key_offset = block.index(b"XORK")
         state.buf = block[-cutoff:] + state.buf
