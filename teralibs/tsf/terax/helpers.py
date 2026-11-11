@@ -285,7 +285,7 @@ def build_parser():
         "-e",
         "--encoder",
         default=None,
-        help="encoder to use  (e.g. encoder/x86/shikata_ga_nai)",
+        help="encoder to use  (e.g. encoder/x86/polymorphic_xor_additive_feedback)",
     )
     p.add_argument(
         "-i",
