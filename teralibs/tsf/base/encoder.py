@@ -381,7 +381,7 @@ class Encoder(Base):
                 raise BadcharError(
                     index=index,
                     stub_size=stub_size,
-                    message=f"The {getattr(self, 'name', 'Shikata')} encoder generated a bad character layout.",
+                    message=f"The {getattr(self, 'NAME', 'selected')} encoder generated a bad character layout.",
                 )
 
     def obtain_key(self, buf, badchars, state):
