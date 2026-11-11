@@ -170,7 +170,7 @@ When a module genuinely doesn't care about architecture or platform, use `[ARCH_
 
 ## Naming Conventions
 
-The module class itself is always named TerasploitModule, regardless of what the module does. File and directory names use snake_case throughout, for example `handler.py`, `shikata_ga_nai.py`, `windows/smb/`, `linux/x64/`. 
+The module class itself is always named TerasploitModule, regardless of what the module does. File and directory names use snake_case throughout, for example `handler.py`, `polymorphic_xor_additive_feedback.py`, `windows/smb/`, `linux/x64/`. 
 
 Option keys and class-level attribute names both use `UPPER_SNAKE_CASE`, as in `RHOST`, `LPORT`, `TIMEOUT`, `PAYLOAD_SPACE` and `SESSION_TYPES`.
 
