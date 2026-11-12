@@ -9,7 +9,7 @@ class CompactHelpFormatter(argparse.RawDescriptionHelpFormatter):
     """RawDescriptionHelpFormatter with terminal-aware column width."""
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("max_help_position", 50)
+        kwargs.setdefault("max_help_position", 55)
         kwargs.setdefault("width", shutil.get_terminal_size(fallback=(80, 24)).columns)
         super().__init__(*args, **kwargs)
 
@@ -26,27 +26,88 @@ class TeraxCLI:
             add_help=True,
             color=False,
         )
-        p.add_argument("-p", "--payload", default=None, help="payload path  (e.g. payload/stagers/windows/x86/reverse_tcp)")
-        p.add_argument("-e", "--encoder", default=None, help="encoder to use  (e.g. encoder/x86/shikata_ga_nai)")
-        p.add_argument("-i", "--iterations", default=1, type=int, help="encoding iterations (default: 1)")
-        p.add_argument("-b", "--bad-chars", default="", dest="bad_chars", help=r"bad chars in \xNN notation  (e.g. '\x00\x0a\x0d')")
         p.add_argument(
-            "-n", "--nop-sled", default=0, type=int, dest="nop", help="prepend number of nop bytes to the payload (0x90 would be 144 bytes)"
+            "-p",
+            "--payload",
+            default=None,
+            help="payload path  (e.g. payload/stagers/windows/x86/reverse_tcp)",
         )
-        p.add_argument("-s", "--space", default=0, type=int, help="maximum payload size in bytes  (0 = unlimited)")
-        p.add_argument("-f", "--format", default="raw", help="output format  (default: raw, see -l formats)")
-        p.add_argument("-o", "--out", default=None, help="output file  (default: stdout)")
-        p.add_argument("--list-options", action="store_true", help="show payload options then exit  (requires -p)")
+        p.add_argument(
+            "-e",
+            "--encoder",
+            default=None,
+            help="encoder to use  (e.g. encoder/x86/polymorphic_xor_additive_feedback)",
+        )
+        p.add_argument(
+            "-i",
+            "--iterations",
+            default=1,
+            type=int,
+            help="encoding iterations (default: 1)",
+        )
+        p.add_argument(
+            "-b",
+            "--bad-chars",
+            default="",
+            dest="bad_chars",
+            help=r"bad chars in \xNN notation  (e.g. '\x00\x0a\x0d')",
+        )
+        p.add_argument(
+            "-n",
+            "--nop-sled",
+            default=0,
+            type=int,
+            dest="nop",
+            help="prepend an architecture-aligned NOP sled of this many bytes",
+        )
+        p.add_argument(
+            "--nop-strategy",
+            default=None,
+            help="nop generation strategy (e.g. single-byte, multi-byte, fixed-width; default: architecture default)",
+        )
+        p.add_argument(
+            "-s",
+            "--space",
+            default=0,
+            type=int,
+            help="maximum payload size in bytes  (0 = unlimited)",
+        )
+        p.add_argument(
+            "-f",
+            "--format",
+            default="raw",
+            help="output format  (default: raw, see -l formats)",
+        )
+        p.add_argument(
+            "-o",
+            "--out",
+            default=None,
+            help="output file  (default: stdout)",
+        )
+        p.add_argument(
+            "--list-options",
+            action="store_true",
+            help="show payload options then exit  (requires -p)",
+        )
         p.add_argument(
             "-l",
             "--list",
             default=None,
             dest="list_type",
-            choices=["payloads", "encoders", "formats", "all"],
-            help="list payloads, encoders, formats, all",
+            choices=["payloads", "encoders", "formats", "nops", "all"],
+            help="list payloads, encoders, formats, NOP strategies, all",
         )
-        p.add_argument("-v", "--verbose", action="store_true", help="enable module level verbosity")
-        p.add_argument("var_overrides", nargs="*", help="option overrides (e.g. LHOST=10.0.0.1)")
+        p.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            help="enable module level verbosity",
+        )
+        p.add_argument(
+            "var_overrides",
+            nargs="*",
+            help="option overrides (e.g. LHOST=10.0.0.1)",
+        )
         return p
 
     @staticmethod
