@@ -33,7 +33,7 @@ class TeraxEncoder:
 
             current = result.encoded_bytes
             key_tag = f"key: 0x{result.key_used:02x}" if isinstance(result.key_used, int) else ""
-            info(f"pass {n:>{pad}}/{iterations} -> {len(current)} bytes | {key_tag}")
+            info(f"pass {n:>{pad}}/{iterations} (size: {len(current)} bytes, {key_tag})")
 
         return current
 
