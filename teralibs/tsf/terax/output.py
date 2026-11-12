@@ -5,11 +5,6 @@ import sys
 from teralibs.terasploit.framework.services.printf import error, print_line, success
 
 
-# Architecture-specific NOP encodings.
-_THUMB2_NOP = b"\x00\xbf"  # Thumb2:   MOV r0, r0  (2 bytes)
-_AARCH64_NOP = b"\x1f\x20\x03\xd5"  # AArch64:  NOP         (4 bytes, LE)
-_X86_NOP = b"\x90"  # x86/x64:  NOP         (1 byte)
-
 # Maps output-file extensions to canonical format names; first match wins.
 _EXT_FORMAT_MAP = {
     ".bin": "raw",
@@ -31,7 +26,7 @@ _EXT_FORMAT_MAP = {
 
 
 class TeraxOutput:
-    """Format detection, NOP sled generation, and payload file emission."""
+    """Format detection and payload file emission."""
 
     @staticmethod
     def detect_format(out_path, arch_list, platform_list):
@@ -58,24 +53,6 @@ class TeraxOutput:
             return "elf"
 
         return "raw"
-
-    @staticmethod
-    def nop_sled(count, arch):
-        """Return *count* NOP bytes suitable for the target architecture."""
-        if not arch:
-            return _X86_NOP * count
-
-        a = arch[0].lower()
-
-        if a in ("arm64", "aarch64"):
-            # AArch64: instructions are always 4 bytes; truncate to alignment.
-            return _AARCH64_NOP * (count // 4)
-
-        if a == "arm":
-            # Thumb2: 2-byte NOPs; append one padding byte for odd counts.
-            return _THUMB2_NOP * (count // 2) + (b"\x00" if count % 2 else b"")
-
-        return _X86_NOP * count
 
     @staticmethod
     def emit(data, fmt_kind, out_path, fmt_name=""):
@@ -107,7 +84,7 @@ class TeraxOutput:
                 try:
                     st_mode = os.stat(path).st_mode
                     os.chmod(path, st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-                    success("executable permission has been applied")
+                    success("execute permissions have been applied")
                 except OSError as exc:
                     error(f"could not set executable bit on {path!r}: {exc}")
 
