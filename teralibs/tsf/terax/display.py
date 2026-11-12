@@ -5,6 +5,7 @@ from teralibs.terasploit.framework.options.storage import OPTION_REGISTRY
 from teralibs.terasploit.framework.services.printf import print_line
 from teralibs.terasploit.framework.services.tables import modules_table
 from teralibs.tsf.terax.formatter import FORMATTERS
+from teralibs.tsf.terax.nop import NopGenerator
 
 
 _FORMAT_ALIASES = frozenset({"py", "rb", "pl", "sh", "ps1"})
@@ -35,10 +36,22 @@ class TeraxDisplay:
         print_line()
 
     def list_all(self):
-        """Print payloads, encoders, and formats in sequence."""
+        """Print payloads, encoders, formats, and NOP strategies in sequence."""
         self.list_payloads()
         self.list_encoders()
         self.list_formats()
+        self.list_nops()
+
+    @staticmethod
+    def list_nops():
+        """Print available NOP strategies and the default for each architecture."""
+        print_line("\nNOP Strategies\n")
+        print_line(f"{'Architecture':<14} {'Available strategies':<34} {'Default'}")
+        print_line(f"{'-' * 14:<14} {'-' * 34:<34} {'-' * 12}")
+        for arch, details in NopGenerator.strategies().items():
+            strategies = ", ".join(details["available"])
+            print_line(f"{arch:<14} {strategies:<34} {details['default']}")
+        print_line()
 
     @staticmethod
     def list_formats():
