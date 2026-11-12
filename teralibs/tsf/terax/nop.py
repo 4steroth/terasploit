@@ -37,7 +37,6 @@ class NopGenerator:
 
         length, arch, badchars, byteorder, strategy = contents
         if isinstance(arch, (list, tuple, set)):
-
             architectures = {str(item).strip().lower() for item in arch if item}
             if len(architectures) != 1:
                 raise ValueError("NOP generation requires exactly one target architecture")
