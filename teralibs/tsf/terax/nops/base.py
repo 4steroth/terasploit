@@ -1,7 +1,12 @@
+from collections.abc import Mapping
+from typing import Literal
+
+
 class NopStrategy:
     """Mixin that dispatches NOP generation to editable architecture strategies."""
 
-    strategy_methods = {"fixed-width": "generate_fixed_width"}
+    name = "base"
+    strategy_methods: Mapping = {"fixed-width": "generate_fixed_width"}
     default_strategy = "fixed-width"
 
     @classmethod
@@ -13,10 +18,12 @@ class NopStrategy:
     def generate(cls, length, badchars=(), byteorder=None, strategy=None):
         """Dispatch NOP generation to the selected architecture strategy."""
         selected = str(strategy or cls.default_strategy).strip().lower()
+
         method_name = cls.strategy_methods.get(selected)
         if method_name is None:
             allowed = ", ".join(cls.available_strategies())
             raise ValueError(f"{cls.name} supports NOP strategy: {allowed}")
+
         return getattr(cls, method_name)(length, badchars, byteorder)
 
 
@@ -26,9 +33,9 @@ class FixedWidthNop(NopStrategy):
     name = "unknown"
     instruction = b""
     alignment = 1
-    default_byteorder = "little"
+    default_byteorder: Literal["little", "big"] = "little"
     byteorders = ("little", "big")
-    strategy_methods = {"fixed-width": "generate_fixed_width"}
+    strategy_methods: Mapping = {"fixed-width": "generate_fixed_width"}
     default_strategy = "fixed-width"
 
     @classmethod
@@ -43,24 +50,17 @@ class FixedWidthNop(NopStrategy):
             allowed = ", ".join(cls.byteorders)
             raise ValueError(f"{cls.name} supports byte order: {allowed}")
         if length % cls.alignment:
-            raise ValueError(
-                f"NOP sled length {length} is not aligned to the "
-                f"{cls.alignment}-byte {cls.name} instruction width"
-            )
+            raise ValueError(f"NOP sled length {length} is not aligned to the {cls.alignment}-byte {cls.name} instruction width")
 
         instruction = cls.instruction
         if order != cls.default_byteorder:
-            instruction = int.from_bytes(instruction, cls.default_byteorder).to_bytes(
-                len(instruction), order
-            )
+            instruction = int.from_bytes(instruction, cls.default_byteorder).to_bytes(len(instruction), order)
 
         forbidden = cls._normalize_badchars(badchars)
         conflicts = sorted(set(instruction) & forbidden)
         if conflicts:
             rendered = ", ".join(f"0x{byte:02x}" for byte in conflicts)
-            raise ValueError(
-                f"the {cls.name} NOP instruction contains forbidden byte(s): {rendered}"
-            )
+            raise ValueError(f"the {cls.name} NOP instruction contains forbidden byte(s): {rendered}")
         return instruction * (length // cls.alignment)
 
     @staticmethod
@@ -80,7 +80,7 @@ class FixedWidthNop(NopStrategy):
             raise TypeError("bad characters must be bytes or an iterable of integer byte values")
         try:
             values = bytes(badchars)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise TypeError("bad characters must contain integer values from 0 to 255") from None
         return frozenset(values)
 
