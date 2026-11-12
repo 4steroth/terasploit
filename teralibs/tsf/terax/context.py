@@ -25,7 +25,7 @@ class TeraxContext:
         self.datastore = Datastore(options)
         self.job_id = "terax"
         self.session = None
-        self.available_space: int | None = available_space
+        self.available_space = available_space
         self._verbose = verbose
 
     def get_option(self, name, _=None):

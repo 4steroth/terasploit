@@ -12,176 +12,176 @@ from teralibs.terasploit.framework.services.printf import (
     success,
     warning,
 )
-from teralibs.tsf.core.exe.builder import Exe
 from teralibs.tsf.pex.poly import EncodingError
-from teralibs.tsf.terax.compat import check_compat
+from teralibs.tsf.terax.cli import TeraxCLI
+from teralibs.tsf.terax.compat import CompatChecker
 from teralibs.tsf.terax.context import TeraxContext
+from teralibs.tsf.terax.display import TeraxDisplay
+from teralibs.tsf.terax.encoder import TeraxEncoder
 from teralibs.tsf.terax.formatter import FORMATTERS
-from teralibs.tsf.terax.helpers import (
-    build_options,
-    build_parser,
-    detect_format,
-    emit_output,
-    encode_auto,
-    encode_explicit,
-    list_all,
-    list_encoders,
-    list_formats,
-    list_payloads,
-    missing_required,
-    nop_sled,
-    parse_overrides,
-    resolve_payload,
-    show_options,
-)
+from teralibs.tsf.terax.options import OptionBuilder
+from teralibs.tsf.terax.output import TeraxOutput
+from teralibs.tsf.terax.payload import PayloadResolver
 from teralibs.tsf.utils.exception import TeraxGenerationError
 from teralibs.tsf.utils.path import ModuleIndex
 
 
 class Terax:
-    """Payload generation pipeline for the terax CLI tool."""
+    """Coordinate payload resolution, generation, encoding, formatting, and output."""
 
     def __init__(self, args, modules, parser):
-        """Initialise with parsed CLI args, a module index, and the argument parser."""
+        """Initialise the generation pipeline and resolve its payload configuration."""
         self._args = args
         self._modules = modules
         self._parser = parser
+        self._display = TeraxDisplay(modules)
+        self._resolver = PayloadResolver(modules)
 
-        # Display start banner
         print_line(f"\n[*] starting @ {datetime.now():%H:%M:%S /%Y-%m-%d/}\n")
-
-        # Handle listing operation
         self._handle_listing()
 
-        # Get value for payload name, payload object, and formatter entry
-        self._payload_name, self._payload_obj, self._formatter_entry = self._resolve_and_validate_payload()
-        self._bad_bytes, self._ctx = self._build_generation_context()
+        self._payload_name, self._payload_obj, self._formatter = self._resolve_payload()
+        self._bad_chars, self._context = self._build_context()
 
     def run(self):
-        """Execute the full payload generation pipeline."""
+        """Execute the complete payload generation pipeline."""
         try:
-            payload = self._generate_raw_payload()
-            payload = self._run_encoding_pipeline(payload)
-
-            self._finalize_payload(payload)
-
+            payload = self._generate_payload()
+            payload = self._encode_payload(payload)
+            self._emit_payload(payload)
         except (TeraxGenerationError, EncodingError) as exc:
-            error(f"{exc}")
+            error(str(exc))
 
     def _handle_listing(self):
-        """Dispatch early-exit listing modes; calls sys.exit(0) on match."""
+        """Handle listing modes before attempting to resolve a payload."""
         if not self._args.list_type:
             return
 
         dispatch = {
-            "payloads": lambda: list_payloads(self._modules),
-            "encoders": lambda: list_encoders(self._modules),
-            "formats": list_formats,
-            "all": lambda: list_all(self._modules),
+            "payloads": self._display.list_payloads,
+            "encoders": self._display.list_encoders,
+            "formats": self._display.list_formats,
+            "all": self._display.list_all,
         }
         dispatch[self._args.list_type]()
         sys.exit(0)
 
-    def _resolve_and_validate_payload(self):
-        """Resolve the payload class, handle --list-options, and validate the format."""
+    def _resolve_payload(self):
+        """Resolve the payload module, validate its output format, and return its formatter."""
         if not self._args.payload:
             self._parser.print_help()
             sys.exit(1)
 
-        payload_name, cls = resolve_payload(self._modules, self._args.payload)
-        if cls is None or payload_name is None:
+        payload_name, payload_class = self._resolver.resolve(self._args.payload)
+        if payload_name is None or payload_class is None:
             sys.exit(1)
 
-        payload_obj = cls()
+        payload_obj = payload_class()
         if self._args.list_options:
-            show_options(payload_obj)
+            self._display.show_options(payload_obj)
             sys.exit(0)
 
-        arch_list = list(getattr(payload_obj, "ARCH", []) or [])
-        plat_list = list(getattr(payload_obj, "PLATFORM", []) or [])
+        arch = list(getattr(payload_obj, "ARCH", []) or [])
+        platforms = list(getattr(payload_obj, "PLATFORM", []) or [])
 
-        # Auto-detect format when the user omitted -f / --format.
-        if self._args.format == "raw" and not any(a in sys.argv for a in ("-f", "--format")):
-            detected = detect_format(self._args.out, arch_list, plat_list)
+        if self._format_was_omitted():
+            detected = TeraxOutput.detect_format(self._args.out, arch, platforms)
             if detected != "raw":
                 info(f"the selected format for this payload is '{detected}' this has been selected by auto-detection")
             self._args.format = detected
 
-        fmt = self._args.format.lower()
-        if fmt not in [f.name for f in FORMATTERS]:
-            error(f"unknown format: {fmt!r}  (run 'terax -l formats' to list all supported formats)")
+        requested_format = self._args.format.lower()
+        formatter = self._find_formatter(requested_format)
+        if formatter is None:
+            error(f"unknown format: {requested_format!r} (run 'terax -l formats' to list all supported formats)")
             sys.exit(1)
 
-        compat = check_compat(fmt, arch_list, plat_list)
-        for msg in compat.warnings:
-            warning(msg)
+        # The beta detector may select elf-aarch64, while the ELF formatter is
+        # intentionally shared by all supported ELF architectures.
+        compat_format = requested_format
+        if requested_format == "elf-aarch64":
+            compat_format = "elf-aarch64"
+        elif requested_format == "elf-x64":
+            compat_format = "elf-x64"
 
-        for msg in compat.errors:
-            error(msg)
-
-        if not compat.ok:
+        compatibility = CompatChecker.check(compat_format, arch, platforms)
+        for message in compatibility.warnings:
+            warning(message)
+        for message in compatibility.errors:
+            error(message)
+        if not compatibility.ok:
             sys.exit(1)
 
-        formatter = next(f for f in FORMATTERS if f.name == fmt)
-        return payload_name, payload_obj, (formatter.function, formatter.output_type, formatter.description)
+        return payload_name, payload_obj, formatter
 
-    def _build_generation_context(self):
-        """Merge options, enforce required fields, parse bad chars, and print the header."""
-        overrides = parse_overrides(self._args.var_overrides)
+    @staticmethod
+    def _find_formatter(name):
+        """Find a formatter by its canonical name, alias, or supported ELF variant."""
+        canonical = "elf" if name in ("elf-aarch64", "elf-x64") else name
+        for formatter in FORMATTERS:
+            if formatter.name == canonical or name in formatter.aliases:
+                return formatter
+        return None
+
+    def _format_was_omitted(self):
+        """Return whether the operator omitted both format flags."""
+        return not any(token in ("-f", "--format") or token.startswith("--format=") for token in sys.argv[1:])
+
+    def _build_context(self):
+        """Build resolved options, validate requirements, parse bad characters, and create context."""
+        overrides = TeraxCLI.parse_overrides(self._args.var_overrides)
         if self._args.iterations != 1 and "ITERATIONS" not in overrides:
             overrides["ITERATIONS"] = str(self._args.iterations)
 
-        options = build_options(self._payload_obj, overrides)
-        missing = missing_required(self._payload_obj, options)
+        options = OptionBuilder.build(self._payload_obj, overrides)
+        missing = OptionBuilder.missing_required(self._payload_obj, options)
         if missing:
-            names_str = ", ".join(missing)
-            example_str = " ".join(f"{k}=<value>" for k in missing)
-            error(
-                f"missing required option(s): {names_str}\n"
-                f"  Provide them as VAR=value arguments, e.g.:\n"
-                f"  terax -p {self._args.payload} {example_str}"
-            )
+            names = ", ".join(missing)
+            examples = " ".join(f"{name}=<value>" for name in missing)
+            error(f"missing required option(s): {names}\n  provide them as VAR=value arguments, e.g.:\n  terax -p {self._args.payload} {examples}")
             sys.exit(1)
 
-        bc_str = self._args.bad_chars or str(getattr(self._payload_obj, "BADCHARS", "") or "")
+        bad_char_string = self._args.bad_chars or str(getattr(self._payload_obj, "BADCHARS", "") or "")
         try:
-            _bad_bytes = BadCharFilter.parse(bc_str) if bc_str else frozenset()
+            bad_chars = BadCharFilter.parse(bad_char_string) if bad_char_string else frozenset()
 
         except ValueError as exc:
-            error(f"Cannot parse bad-char string: {exc}")
+            error(f"cannot parse bad-char string: {exc}")
             sys.exit(1)
 
-        self._print_generation_header(bc_str)
-        _ctx = TeraxContext(options, verbose=self._args.verbose)
+        self._print_generation_header(bad_char_string)
+        context = TeraxContext(options, verbose=self._args.verbose)
+        return bad_chars, context
 
-        return _bad_bytes, _ctx
-
-    def _print_generation_header(self, bc_str):
-        """Print the pre-generation summary block."""
-        arch_list = list(getattr(self._payload_obj, "ARCH", []))
-        plat_list = list(getattr(self._payload_obj, "PLATFORM", []))
-        arch_noun = "architectures" if len(arch_list) > 1 else "architecture"
+    def _print_generation_header(self, bad_char_string):
+        """Print the selected payload metadata and generation settings."""
+        arch = list(getattr(self._payload_obj, "ARCH", []) or [])
+        platforms = list(getattr(self._payload_obj, "PLATFORM", []) or [])
+        arch_label = "architectures" if len(arch) > 1 else "architecture"
 
         info(f"using '{self._payload_name.replace('.', '/')}' to generate payload")
-        info(f"the selected payload targets -> '{', '.join(plat_list) or 'any platform'}'")
-        info(f"the selected payload supports -> '{', '.join(arch_list) or 'any'}' {arch_noun}")
+        info(f"the selected payload targets -> '{', '.join(platforms) or 'any platform'}'")
+        info(f"the selected payload supports -> '{', '.join(arch) or 'any'}' {arch_label}")
         info(f"the selected or preferred output format for this payload -> {self._args.format.lower()}")
 
-        if bc_str:
-            info(f"bad character(s) specified -> '{bc_str}' this char will be excluded to prevent payload from being corrupted, truncated, or broken")
+        if bad_char_string:
+            info(
+                f"bad character(s) specified -> '{bad_char_string}' "
+                "this char will be excluded to prevent payload from being corrupted, truncated, or broken"
+            )
 
         if self._args.nop:
-            noun = "bytes" if self._args.nop > 1 else "byte"
+            noun = "bytes" if self._args.nop != 1 else "byte"
             info(f"nop sled size: {self._args.nop} {noun}")
 
         if self._args.space:
-            noun = "bytes" if self._args.space > 1 else "byte"
+            noun = "bytes" if self._args.space != 1 else "byte"
             info(f"payload max size: {self._args.space} {noun}")
 
-    def _generate_raw_payload(self):
-        """Call payload_obj.generate(ctx) and return the raw payload."""
+    def _generate_payload(self):
+        """Generate the raw payload through the resolved payload module."""
         try:
-            raw_result = self._payload_obj.generate(self._ctx)
+            result = self._payload_obj.generate(self._context)
 
         except TeraxGenerationError as exc:
             error(f"payload generation failed: {exc}")
@@ -189,95 +189,96 @@ class Terax:
                 traceback.print_exc()
             sys.exit(1)
 
-        if not isinstance(raw_result, (bytes, bytearray)) and isinstance(raw_result, str):
-            return str(raw_result)
-
-        if not isinstance(raw_result, (bytes, bytearray)):
-            error(f"payload.generate() returned {type(raw_result).__name__!r} in fallback check - expected bytes.")
+        if isinstance(result, str):
+            return result
+        if not isinstance(result, (bytes, bytearray)):
+            error(f"payload.generate() returned {type(result).__name__!r} - expected bytes or str")
             sys.exit(1)
+        return bytes(result)
 
-        return bytes(raw_result)
+    def _encode_payload(self, payload):
+        """Apply explicit or automatic encoding and report any remaining bad characters."""
+        arch = list(getattr(self._payload_obj, "ARCH", []) or [])
+        encoder = (self._args.encoder or "").lower()
 
-    def _run_encoding_pipeline(self, payload):
-        """Run the encoder (explicit, auto, or skip) and perform a bad-char scan."""
-        arch_list = list(getattr(self._payload_obj, "ARCH", []) or [])
-
-        skip_encoding = self._args.encoder and self._args.encoder.lower() == "none"
-        if not skip_encoding:
+        if encoder != "none":
             if self._args.encoder:
-                encoded = encode_explicit(payload, self._args.encoder, arch_list, self._bad_bytes, self._args.iterations)
-                if encoded is None:
+                payload = TeraxEncoder.encode_explicit(
+                    payload,
+                    self._args.encoder,
+                    arch,
+                    self._bad_chars,
+                    self._args.iterations,
+                )
+                if payload is None:
                     sys.exit(1)
-                payload = encoded
+            elif self._bad_chars:
+                payload = TeraxEncoder.encode_auto(payload, arch, self._bad_chars, self._args.verbose)
 
-            elif self._bad_bytes:
-                payload = encode_auto(payload, arch_list, self._bad_bytes, self._args.verbose)
-
-        if self._bad_bytes:
-            scan = BadCharFilter.scan(payload, self._bad_bytes)
+        if self._bad_chars:
+            scan = BadCharFilter.scan(payload, self._bad_chars)
             if scan.clean:
                 success("no bad characters found in the payload")
-
             else:
                 warning(f"bad bytes still present after encoding: {scan.summary()}")
                 print_line(BadCharFilter.format_hits(scan))
-                print_line("byte map (xx = bad):\n" + BadCharFilter.byte_map(self._bad_bytes))
+                print_line("byte map (xx = bad):\n" + BadCharFilter.byte_map(self._bad_chars))
 
         return payload
 
-    def _finalize_payload(self, payload):
-        """Prepend NOP sled, enforce size limit, format, and emit the payload."""
-        arch_list = list(getattr(self._payload_obj, "ARCH", []) or [])
-
+    def _emit_payload(self, payload):
+        """Apply the NOP sled and size limit, format the payload, and write the result."""
+        arch = list(getattr(self._payload_obj, "ARCH", []) or [])
         if self._args.nop > 0:
-            sled = nop_sled(self._args.nop, arch_list)
+            if isinstance(payload, str):
+                error("cannot prepend a NOP sled to a text payload")
+                sys.exit(1)
+            sled = TeraxOutput.nop_sled(self._args.nop, arch)
             payload = sled + payload
             info(f"nop sled: {len(sled)} bytes prepended")
 
-        shellcode_size = len(payload)
-        if self._args.space > 0 and shellcode_size > self._args.space:
-            error(f"payload size {shellcode_size} bytes exceeds size limit. aborting...")
+        payload_size = len(payload)
+        if self._args.space > 0 and payload_size > self._args.space:
+            error(f"payload size {payload_size} bytes exceeds size limit. aborting...")
             sys.exit(1)
 
-        formatter_fn, fmt_kind, _ = self._formatter_entry
-        fmt_name = self._args.format.lower()
-        if fmt_name == "exe":
-            exe = Exe(self._payload_obj.ARCH)
-            formatted = exe.build(payload)
+        format_name = self._args.format.lower()
+        arch_name = arch[0] if arch else "x86"
+        formatted = self._formatter.function(payload, arch_name)
+        output_size = len(formatted) if isinstance(formatted, (bytes, bytearray)) else len(str(formatted))
 
-        else:
-            arch_str = (arch_list[0] if arch_list else "x64") if fmt_name == "elf" else ""
-            formatted = formatter_fn(payload, arch_str)
-
-        output_size = len(formatted) if isinstance(formatted, bytes) else len(str(formatted))
-
-        info(f"payload size: {shellcode_size:,} bytes")
-        info(f"file size: {output_size:,} bytes in ({fmt_name}) format")
-
-        emit_output(formatted, out_path=self._args.out, fmt_kind=fmt_kind, fmt_name=fmt_name)
+        info(f"payload size: {payload_size:,} bytes")
+        info(f"file size: {output_size:,} bytes in ({format_name}) format")
+        TeraxOutput.emit(
+            formatted,
+            fmt_kind=self._formatter.output_type,
+            out_path=self._args.out,
+            fmt_name=format_name,
+        )
 
     def __repr__(self):
-        payload = getattr(self, "_payload_name", None) or getattr(self._args, "payload", None) or "unset"
-        payload = payload.replace(".", "/")
+        """Return a concise representation of the active generation configuration."""
+        payload = (getattr(self, "_payload_name", None) or getattr(self._args, "payload", None) or "unset").replace(".", "/")
+        parts = [
+            f"payload={payload!r}",
+            f"format={getattr(self._args, 'format', 'raw')!r}",
+        ]
 
         encoder = getattr(self._args, "encoder", None)
         bad_chars = getattr(self._args, "bad_chars", "")
-        out = getattr(self._args, "out", None)
-
-        parts = [f"payload={payload!r}", f"format={getattr(self._args, 'format', 'raw')!r}"]
+        output = getattr(self._args, "out", None)
         if encoder:
             parts.append(f"encoder={encoder!r}")
         if bad_chars:
             parts.append(f"bad_chars={bad_chars!r}")
-        if out:
-            parts.append(f"out={out!r}")
-
+        if output:
+            parts.append(f"out={output!r}")
         return f"Terax({', '.join(parts)})"
 
 
 def main():
-    """Entry point: parse args, construct Terax, run the pipeline."""
-    parser = build_parser()
+    """Parse CLI arguments and execute the terax payload generation pipeline."""
+    parser = TeraxCLI.build_parser()
     args = parser.parse_args()
 
     set_timestamp(True)
