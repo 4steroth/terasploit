@@ -19,6 +19,7 @@ from teralibs.tsf.terax.context import TeraxContext
 from teralibs.tsf.terax.display import TeraxDisplay
 from teralibs.tsf.terax.encoder import TeraxEncoder
 from teralibs.tsf.terax.formatter import FORMATTERS
+from teralibs.tsf.terax.nop import NopGenerator
 from teralibs.tsf.terax.options import OptionBuilder
 from teralibs.tsf.terax.output import TeraxOutput
 from teralibs.tsf.terax.payload import PayloadResolver
@@ -61,6 +62,7 @@ class Terax:
             "payloads": self._display.list_payloads,
             "encoders": self._display.list_encoders,
             "formats": self._display.list_formats,
+            "nops": self._display.list_nops,
             "all": self._display.list_all,
         }
         dispatch[self._args.list_type]()
@@ -173,6 +175,7 @@ class Terax:
         if self._args.nop:
             noun = "bytes" if self._args.nop != 1 else "byte"
             info(f"nop sled size: {self._args.nop} {noun}")
+            info(f"nop strategy: {self._args.nop_strategy or NopGenerator.default_strategy_for(arch[0]) if arch else 'architecture default'}")
 
         if self._args.space:
             noun = "bytes" if self._args.space != 1 else "byte"
@@ -233,7 +236,12 @@ class Terax:
             if isinstance(payload, str):
                 error("cannot prepend a NOP sled to a text payload")
                 sys.exit(1)
-            sled = TeraxOutput.nop_sled(self._args.nop, arch)
+            try:
+                sled = NopGenerator.generate((self._args.nop, arch, self._bad_chars, None, self._args.nop_strategy))
+
+            except (TypeError, ValueError) as exc:
+                error(f"cannot generate NOP sled: {exc}")
+                sys.exit(1)
             payload = sled + payload
             info(f"nop sled: {len(sled)} bytes prepended")
 
