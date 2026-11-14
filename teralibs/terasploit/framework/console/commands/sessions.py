@@ -58,7 +58,7 @@ class SessionsCommands:
             return
 
         self._print_sessions_table(sessions)
-        print_line("\n\nUse 'interact <id>' to attach, or 'sessions -C <id> <cmd>' to run a single command.\n")
+        print_line()
 
     def _run_session_command(self, args):
         """Handle 'sessions -C <session_id> <command>'."""
