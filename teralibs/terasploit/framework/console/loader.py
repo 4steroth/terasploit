@@ -1,10 +1,9 @@
 import dataclasses
 
-from teralibs.terasploit.framework.console.helpers import _to_path
-from teralibs.terasploit.framework.console.terasploit import Terasploit
+from teralibs.terasploit.framework.console.base import BaseConsole
+from teralibs.terasploit.framework.console.helpers import to_path
 from teralibs.terasploit.framework.encoder.factory import EncoderFactory
-from teralibs.terasploit.framework.encoder.package import Encoder
-from teralibs.terasploit.framework.modules.payload_validator import payload_validate
+from teralibs.terasploit.framework.module.payload.validator import payload_validate
 from teralibs.terasploit.framework.options.storage import (
     DRIVER_ADVANCED_OPTIONS,
     OPTION_REGISTRY,
@@ -28,6 +27,7 @@ from teralibs.terasploit.framework.services.printf import (
     success,
     warning,
 )
+from teralibs.tsf.base.encoder import Encoder
 from teralibs.tsf.utils.exception import ModuleInitializationError
 
 
@@ -65,8 +65,12 @@ def _resolve_keys(keys):
     return resolved
 
 
-class ConsoleLoader(Terasploit):
-    """Mixin that contributes module/payload/encoder loading and option-set command handlers to CLi."""
+class ConsoleLoader:
+    """Load modules, payloads, encoders, and console options."""
+
+    def __init__(self, console: BaseConsole) -> None:
+        """Bind the loader to the shared console."""
+        self.console = console
 
     def resolve_module_name(self, args):
         """Validate *args* and resolve a raw module name to a canonical dotted path."""
@@ -80,10 +84,10 @@ class ConsoleLoader(Terasploit):
         if raw.startswith("encoder.") or args[0].startswith("encoder/"):
             return "__encoder__"
 
-        if self.modules.get_path(raw) is not None:
+        if self.console.modules.get_path(raw) is not None:
             return raw
 
-        matches = self.modules.search(raw)
+        matches = self.console.modules.search(raw)
         if not matches:
             error(f"Module not found: {args[0]!r}")
             return None
@@ -114,7 +118,7 @@ class ConsoleLoader(Terasploit):
         elif name in handlers:
             handlers[name]()
 
-    def _cmd_use(self, args):
+    def cmd_use(self, args):
         """Load a module into the active module slot."""
         resolved = self.resolve_module_name(args)
         if resolved is None:
@@ -141,7 +145,7 @@ class ConsoleLoader(Terasploit):
 
     def _import_module_class(self, resolved: str):
         """Loads the raw file module structure and extracts the TerasploitModule class."""
-        mod = self.modules.load(resolved)
+        mod = self.console.modules.load(resolved)
         if mod is None:
             error(f"Failed to load module file: {resolved!r}")
             return None
@@ -162,53 +166,53 @@ class ConsoleLoader(Terasploit):
             return None
 
         # Clear existing module first before setting the new one to avoid options duplicates
-        if self.module_storage.module() is not None:
-            self._cmd_back(args)
+        if self.console.module_storage.module() is not None:
+            self.cmd_back(args)
 
-        self.module_storage.set_module(resolved, obj)
-        debug(f"using module: {_to_path(resolved)}")
+        self.console.module_storage.set_module(resolved, obj)
+        debug(f"using module: {to_path(resolved)}")
         return obj
 
     def _register_standard_module_scopes(self, resolved: str, obj) -> None:
         """Reset and repopulate the module, advanced and evasion scopes."""
-        self.datastore.clear_scope("module")
+        self.console.datastore.clear_scope("module")
         if obj.OPTIONS:
-            self.datastore.register("module", _resolve_keys(obj.OPTIONS))
+            self.console.datastore.register("module", _resolve_keys(obj.OPTIONS))
         # Post modules expose SESSION in "show options" and in missing_required.
         if resolved.startswith("post"):
-            self.datastore.register("module", POST_MODULE_OPTIONS)
+            self.console.datastore.register("module", POST_MODULE_OPTIONS)
 
-        self.datastore.clear_scope("module_advanced")
+        self.console.datastore.clear_scope("module_advanced")
         if resolved.startswith("exploit"):
-            self.datastore.register("module_advanced", DRIVER_ADVANCED_OPTIONS)
+            self.console.datastore.register("module_advanced", DRIVER_ADVANCED_OPTIONS)
         if obj.ADVANCED_OPTIONS:
-            self.datastore.register("module_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
+            self.console.datastore.register("module_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
 
-        self.datastore.clear_scope("module_evasion")
+        self.console.datastore.clear_scope("module_evasion")
         if obj.EVASION_OPTIONS:
-            self.datastore.register("module_evasion", _resolve_keys(obj.EVASION_OPTIONS))
+            self.console.datastore.register("module_evasion", _resolve_keys(obj.EVASION_OPTIONS))
 
     def _apply_module_defaults(self, resolved: str, obj) -> None:
         """Applies default target/mode selection and auto-loads a payload."""
         if resolved.startswith("exploit"):
-            self.datastore.set_value("TARGET", obj.TARGET[0][1], "module")
+            self.console.datastore.set_value("TARGET", obj.TARGET[0][1], "module")
 
         if resolved.startswith("auxiliary"):
-            self.datastore.set_value("AUXILIARY_MODE", obj.AUXILIARY_MODE[0][1], "module")
+            self.console.datastore.set_value("AUXILIARY_MODE", obj.AUXILIARY_MODE[0][1], "module")
 
         default_payload = getattr(obj, "DEFAULT_PAYLOAD", None)
-        if default_payload and not self.module_storage.has_payload():
+        if default_payload and not self.console.module_storage.has_payload():
             info(f"Auto-loading default payload: {default_payload}")
             self._load_payload(default_payload, silent=True)
 
-    def _cmd_back(self, _):
+    def cmd_back(self, _):
         """Unload the active module and return to the root prompt."""
-        module = self.module_storage.module()
+        module = self.console.module_storage.module()
 
         if module and hasattr(module, "name"):
-            self.module_storage.clear_module()
-            self.module_storage.clear_payload()
-            self.module_storage.clear_encoder()
+            self.console.module_storage.clear_module()
+            self.console.module_storage.clear_payload()
+            self.console.module_storage.clear_encoder()
 
             for scope in (
                 "module",
@@ -219,14 +223,14 @@ class ConsoleLoader(Terasploit):
                 "payload_evasion",
                 "encoder",
             ):
-                self.datastore.clear_scope(scope)
+                self.console.datastore.clear_scope(scope)
 
-            info(f"Unloaded: {_to_path(module.name)}")
+            info(f"Unloaded: {to_path(module.name)}")
 
-        if not self.module_storage.has_module():
+        if not self.console.module_storage.has_module():
             warning("No module is currently loaded.")
 
-    def _cmd_set(self, args):
+    def cmd_set(self, args):
         """Assign a value to an option in the active datastore."""
         if len(args) < 2:
             warning("Usage: set <option> <value>")
@@ -250,10 +254,10 @@ class ConsoleLoader(Terasploit):
 
     def _set_generic(self, name, value):
         """Write *name* / *value* to the appropriate scope and report the result."""
-        if not self.module_storage.has_module():
-            result = self.datastore.validate(name, value, scope="framework")
+        if not self.console.module_storage.has_module():
+            result = self.console.datastore.validate(name, value, scope="framework")
             if result.ok:
-                self.datastore.set_value(name, value, scope="framework")
+                self.console.datastore.set_value(name, value, scope="framework")
                 self.apply_framework_option(name, value)
                 print_line(f"{name} => {value}")
                 return
@@ -261,15 +265,15 @@ class ConsoleLoader(Terasploit):
             warning(result.reason)
             return
 
-        result = self.datastore.validate(name, value)
+        result = self.console.datastore.validate(name, value)
         if result.ok:
-            self.datastore.set_value(name, value)
+            self.console.datastore.set_value(name, value)
             print_line(f"{name} => {value}")
             return
 
         warning(result.reason)
 
-    def _cmd_unset(self, args):
+    def cmd_unset(self, args):
         """Reset a module-scope option to empty (None)."""
         if not args:
             warning("Usage: unset <option>")
@@ -277,7 +281,7 @@ class ConsoleLoader(Terasploit):
 
         name = args[0].upper()
 
-        if self.datastore.set_value(name, None):
+        if self.console.datastore.set_value(name, None):
             info(f"Unset: {name}")
             return
 
@@ -302,7 +306,7 @@ class ConsoleLoader(Terasploit):
             if new_max < 1:
                 raise ValueError("must be >= 1")
 
-            self.thread_handler.set_max_threads(new_max)
+            self.console.thread_handler.set_max_threads(new_max)
             info(f"Thread pool resized to {new_max} worker(s).")
 
         except (ValueError, TypeError) as exc:
@@ -333,8 +337,8 @@ class ConsoleLoader(Terasploit):
         """Load a payload module and register its options into the datastore."""
         name = raw.replace("/", ".")
 
-        if self.modules.get_path(name) is None:
-            matches = self.modules.search(name)
+        if self.console.modules.get_path(name) is None:
+            matches = self.console.modules.search(name)
 
             if not matches:
                 error(f"Payload not found: {raw!r}")
@@ -343,12 +347,12 @@ class ConsoleLoader(Terasploit):
             if len(matches) > 1:
                 warning(f"Ambiguous payload - {len(matches)} match(es):")
                 for match in matches[:8]:
-                    print_line(f"   {_to_path(match)}")
+                    print_line(f"   {to_path(match)}")
                 return
 
             name = matches[0]
 
-        mod = self.modules.load(name)
+        mod = self.console.modules.load(name)
         if mod is None:
             error(f"Failed to load payload file: {name!r}")
             return
@@ -360,11 +364,11 @@ class ConsoleLoader(Terasploit):
 
         obj = cls()
 
-        module_entry = self.module_storage.module()
+        module_entry = self.console.module_storage.module()
         if module_entry is not None:
             result = payload_validate(module_entry.module, obj)
             if not result.compatible:
-                error(f"Payload {_to_path(name)} is incompatible with {_to_path(module_entry.name)}:")
+                error(f"Payload {to_path(name)} is incompatible with {to_path(module_entry.name)}:")
                 for reason in result.reasons:
                     print_line(f"   {RED}[-]{RESET} {reason}")
                 return
@@ -372,36 +376,36 @@ class ConsoleLoader(Terasploit):
         self._payload_options(name, obj)
 
         if not silent:
-            print_line(f"PAYLOAD => {_to_path(name)}")
+            print_line(f"PAYLOAD => {to_path(name)}")
 
     def _payload_options(self, name, obj):
         """Register a payload's options into the datastore scopes."""
-        self.module_storage.set_payload(name, obj)
-        self.datastore.clear_scope("payload")
-        self.datastore.clear_scope("payload_advanced")
-        self.datastore.clear_scope("payload_evasion")
+        self.console.module_storage.set_payload(name, obj)
+        self.console.datastore.clear_scope("payload")
+        self.console.datastore.clear_scope("payload_advanced")
+        self.console.datastore.clear_scope("payload_evasion")
 
         if obj.OPTIONS:
-            self.datastore.register("payload", _resolve_keys(obj.OPTIONS))
+            self.console.datastore.register("payload", _resolve_keys(obj.OPTIONS))
 
         # Transport-level advanced options apply to every payload; the
         # payload's own ADVANCED_OPTIONS layer on top.
-        self.datastore.register("payload_advanced", PAYLOAD_ADVANCED_OPTIONS)
+        self.console.datastore.register("payload_advanced", PAYLOAD_ADVANCED_OPTIONS)
         if obj.ADVANCED_OPTIONS:
-            self.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
+            self.console.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
 
         if getattr(obj.HANDLER, "HANDLER_TYPE", None) == "reverse":
-            self.datastore.register("payload_advanced", REVERSE_TCP_ADVANCED_OPTIONS)
+            self.console.datastore.register("payload_advanced", REVERSE_TCP_ADVANCED_OPTIONS)
 
         if obj.PAYLOAD_TYPE == "stager":
-            self.datastore.register("payload_advanced", STAGER_ADVANCED_OPTIONS)
+            self.console.datastore.register("payload_advanced", STAGER_ADVANCED_OPTIONS)
 
         # Evasion options are opt-in per payload via EVASION_OPTIONS, not dumped globally.
         if obj.STAGE_ENCODING is True:
-            self.datastore.register("payload_advanced", PAYLOAD_EVASION_OPTIONS)
+            self.console.datastore.register("payload_advanced", PAYLOAD_EVASION_OPTIONS)
 
         if obj.EVASION_OPTIONS:
-            self.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
+            self.console.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
 
         if obj.STAGE_ENCODING is False and obj.EVASION_OPTIONS:
             warning("Evasion options found in module metadata, but the module does not support stage encoding.")
@@ -412,19 +416,19 @@ class ConsoleLoader(Terasploit):
         if not name.startswith("encoder."):
             name = "encoder." + name
 
-        if self.modules.get_path(name) is None:
-            matches = self.modules.search(name)
+        if self.console.modules.get_path(name) is None:
+            matches = self.console.modules.search(name)
             if not matches:
                 error(f"Encoder not found: {raw!r}")
                 return
             if len(matches) > 1:
                 warning(f"Ambiguous encoder - {len(matches)} match(es):")
                 for match in matches[:8]:
-                    print_line(f"   {_to_path(match)}")
+                    print_line(f"   {to_path(match)}")
                 return
             name = matches[0]
 
-        mod = self.modules.load(name)
+        mod = self.console.modules.load(name)
         if mod is None:
             error(f"Failed to load encoder file: {name!r}")
             return
@@ -444,11 +448,11 @@ class ConsoleLoader(Terasploit):
             return
 
         EncoderFactory.register(obj)
-        self.module_storage.set_encoder(name, obj)
+        self.console.module_storage.set_encoder(name, obj)
 
         # Record the active encoder name in the payload_advanced scope using
         # the public datastore API so it is visible in 'show options'.
-        self.datastore.set_value("ENCODER", obj.NAME, scope="payload_advanced")
+        self.console.datastore.set_value("ENCODER", obj.NAME, scope="payload_advanced")
 
         # Load all options to register in datastore.
         self._encoder_options(obj)
@@ -456,29 +460,29 @@ class ConsoleLoader(Terasploit):
         if not silent:
             rank_label = getattr(obj.RANK, "label", lambda: str(obj.RANK))()
             arch_str = ", ".join(obj.ARCH) if obj.ARCH else "generic"
-            print_line(f"ENCODER => {_to_path(name)}")
-            success(f"Encoder loaded: {_to_path(name)} [rank={rank_label}, arch={arch_str}]")
+            print_line(f"ENCODER => {to_path(name)}")
+            success(f"Encoder loaded: {to_path(name)} [rank={rank_label}, arch={arch_str}]")
 
     def _encoder_options(self, obj):
         """Load all available options for encoder."""
 
         # Clear all current encoder options.
-        self.datastore.clear_scope("encoder")
+        self.console.datastore.clear_scope("encoder")
 
         if obj.OPTIONS:
-            self.datastore.register("encoder", _resolve_keys(obj.OPTIONS))
+            self.console.datastore.register("encoder", _resolve_keys(obj.OPTIONS))
 
         if obj.ADVANCED_OPTIONS:
-            self.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
+            self.console.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
 
         if obj.EVASION_OPTIONS:
-            self.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
+            self.console.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
 
     def _select_indexed_option(self, value, setup) -> None:
         """Select an item from a module's indexed option list by numeric ID."""
         attr_name, not_loaded_label, no_items_label, numeric_label, store_tuple_value, double_space_quirk = setup
 
-        module_entry = self.module_storage.module()
+        module_entry = self.console.module_storage.module()
         if module_entry is None:
             warning(f"No module loaded - cannot set {not_loaded_label}.")
             return
@@ -501,7 +505,7 @@ class ConsoleLoader(Terasploit):
             error(f"Invalid target ID {tid}.{spacer}Valid IDs: {valid_ids}")
             return
 
-        self.datastore.set_value(attr_name, items[tid][1] if store_tuple_value else tid, "module")
+        self.console.datastore.set_value(attr_name, items[tid][1] if store_tuple_value else tid, "module")
         print_line(f"{attr_name} => {tid}  ({next(t[1] for t in items if t[0] == tid)})")
 
     def _set_target(self, value):

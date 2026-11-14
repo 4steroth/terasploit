@@ -70,10 +70,6 @@ class ExploitError(TsfBaseException):
     """Raised when error occured in exploit's methods."""
 
 
-class NopError(TsfBaseException):
-    """Raised when error occured in nop's methods."""
-
-
 class TeraxGenerationError(TeraxException):
     """Raised when payload generation fails."""
 

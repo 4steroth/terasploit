@@ -1,4 +1,3 @@
-import contextlib
 import dataclasses
 from dataclasses import field
 from typing import Any
@@ -6,7 +5,6 @@ from typing import Any
 from teralibs.terasploit.framework.encoder.factory import EncoderFactory
 from teralibs.terasploit.framework.payload.badchars import BadCharFilter
 from teralibs.terasploit.framework.payload.sizer import PayloadSizeChecker
-from teralibs.tsf.utils.path import ModuleIndex
 
 
 @dataclasses.dataclass
@@ -203,79 +201,6 @@ class ExploitContext:
                 self.error(err)
             raise ValueError(f"Payload size check failed ({size_result.generated:,} bytes). See above for details.")
 
-    def _run_nop_sled_prepend(self, raw: bytes) -> bytes:
-        """Prepend a NOP sled when ``NopSledSize`` is set and non-zero."""
-        sled_size_raw = self.datastore.get_value("NopSledSize") or "0"
-
-        sled_size = 0
-        with contextlib.suppress(TypeError, ValueError):
-            sled_size = int(sled_size_raw)
-
-        if sled_size <= 0:
-            return raw
-
-        # Resolve bad-char set so the nop module can check compatibility.
-        raw_bc = self._resolve_option_cascade("BADCHARS")
-        badchars: frozenset[int] = self._parse_badchars(raw_bc) if raw_bc else frozenset()
-
-        # Resolve the nop module to use.
-        arch = getattr(self._payload, "ARCH", []) or []
-        nop_module_name = self.datastore.get_value("NopSledModule") or None
-        nop_inst = self._resolve_nop_module(nop_module_name, arch, badchars)
-        if nop_inst is None:
-            self.warning(
-                f"[NopSled] Could not find a compatible NOP module for arch={arch} badchars={len(badchars)} byte(s) - skipping sled prepend."
-            )
-            return raw
-
-        result = nop_inst.generate(sled_size, badchars)
-        if not result.success:
-            self.warning(f"[NopSled] Generation failed: {result.error} - skipping.")
-            return raw
-
-        self.info(f"[NopSled] Prepending {len(result.sled_bytes):,}-byte sled via '{result.nop_name}'.")
-        return result.sled_bytes + raw
-
-    def _resolve_nop_module(self, name: str | None, arch: list, badchars: frozenset[int]):
-        """Return an instantiated Nops module or None."""
-        idx = ModuleIndex()
-        if name:
-            with contextlib.suppress(Exception):
-                mod = idx.load(name if "." in name else name.replace("/", "."))
-                if mod:
-                    return mod.TerasploitModule()
-                raise RuntimeError("Nop module cannot load.")
-
-            self.warning(f"[NopSled] Cannot load '{name}'")
-            return None
-
-        # Auto-select: prefer modules whose ARCH overlaps the payload's arch.
-        arch_set = {a.lower() for a in arch} if arch else set()
-
-        for module_name in sorted(idx.list_modules()):
-            inst = None
-            if not module_name.startswith("nop."):
-                continue
-
-            with contextlib.suppress(Exception):
-                mod = idx.load(module_name)
-                if mod:
-                    inst = mod.TerasploitModule()
-                raise RuntimeError("Nop module cannot load.")
-
-            if not inst:
-                continue
-
-            # Arch compatibility: empty ARCH on module means "any".
-            mod_arch = {a.lower() for a in (inst.ARCH or [])}
-            if mod_arch and arch_set and mod_arch.isdisjoint(arch_set):
-                continue
-
-            if inst.can_avoid(badchars):
-                return inst
-
-        return None
-
 
 @dataclasses.dataclass
 class ExploitContextDeps:
@@ -296,7 +221,7 @@ class PostContextDeps:
     job_id: Any
     bus: Any
     datastore: Any
-    session: Any  # ShellSession instance resolved by _cmd_run
+    session: Any  # ShellSession instance resolved by cmd_run
 
 
 class PostContext:

@@ -23,13 +23,13 @@ class GenericShell(BaseShell):
         args = parts[1:]
 
         if command == "upload":
-            self._cmd_upload(args)
+            self.cmd_upload(args)
         elif command == "download":
-            self._cmd_download(args)
+            self.cmd_download(args)
         else:
             super()._handle_user_input(raw)
 
-    def _cmd_upload(self, args):
+    def cmd_upload(self, args):
         """Upload a local file to the target by piping Base64 through the shell."""
         if len(args) < 2:
             warning("Usage: upload <local_path> <remote_path>")
@@ -57,7 +57,7 @@ class GenericShell(BaseShell):
         except TerasploitShellError as exc:
             error(f"Failed to prepare upload: {exc}")
 
-    def _cmd_download(self, args):
+    def cmd_download(self, args):
         """Download a file from the target by reading its Base64-encoded output."""
         if not args:
             warning("Usage: download <remote_path> [local_path]")

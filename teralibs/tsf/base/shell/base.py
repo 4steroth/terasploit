@@ -216,22 +216,22 @@ class BaseShell:
         command = parts[0].lower()
 
         if command in ("background", "bg"):
-            self._cmd_background()
+            self.cmd_background()
 
         elif command in ("exit", "quit"):
-            self._cmd_exit()
+            self.cmd_exit()
 
         elif command == "sessions":
-            self._cmd_sessions()
+            self.cmd_sessions()
 
         elif command == "shell":
-            self._cmd_shell()
+            self.cmd_shell()
 
         elif command == "loot":
-            self._cmd_loot(parts[1:])
+            self.cmd_loot(parts[1:])
 
         elif command in ("help", "?"):
-            self._cmd_help()
+            self.cmd_help()
 
         else:
             self._send(raw)
@@ -259,18 +259,18 @@ class BaseShell:
             with contextlib.suppress(OSError):
                 self._sock.setblocking(False)
 
-    def _cmd_background(self):
+    def cmd_background(self):
         """Detach the shell and return control to the framework console."""
         info(f"Backgrounding session {self._session.session_id}.")
         self._running = False
 
-    def _cmd_exit(self):
+    def cmd_exit(self):
         """Close the session and exit the shell."""
         info(f"Closing session {self._session.session_id}.")
         self._sock.setblocking(self.was_blocking)
         self._session.close()
 
-    def _cmd_sessions(self):
+    def cmd_sessions(self):
         """List all active sessions."""
         sessions = self._registry_fn()
         print_line("\nActive Sessions:")
@@ -278,12 +278,12 @@ class BaseShell:
             print_line(f"  {sid} -> {sess.transport.addr[0]}:{sess.transport.addr[1]}")
         print_line()
 
-    def _cmd_shell(self):
+    def cmd_shell(self):
         """Enter raw passthrough mode — all input is forwarded verbatim."""
         self._raw_mode = True
         info("Entered raw shell mode. Type 'exit_raw' to return to normal mode.")
 
-    def _cmd_loot(self, args):
+    def cmd_loot(self, args):
         """Run a command on the target and save the output to a local file."""
         if len(args) < 2:
             warning("Usage: loot <local_file> <command...>")
@@ -307,7 +307,7 @@ class BaseShell:
         safe_cmd = remote_cmd.replace("'", "'\\''")
         return f"( {safe_cmd} ) 2>&1 | base64; echo '---TERASPLOIT_SHELL_EOF---'"
 
-    def _cmd_help(self):
+    def cmd_help(self):
         """Print available built-in commands. Subclasses supply sections."""
         self._print_help_sections(self._help_sections())
 

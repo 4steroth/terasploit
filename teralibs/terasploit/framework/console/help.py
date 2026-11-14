@@ -58,10 +58,4 @@ help_sections = [
             ("kill all", "Close every open session"),
         ],
     ),
-    (
-        "Nop",
-        [
-            ("generate [size] [-b <bc>]", "Generate a NOP sled from the active nop module"),
-        ],
-    ),
 ]

@@ -54,7 +54,7 @@ class WindowsShell(GenericShell):
 
         return raw
 
-    def _cmd_upload(self, args):
+    def cmd_upload(self, args):
         """Upload a file to Windows by decoding a Base64 stream via PowerShell."""
         if len(args) < 2:
             warning("Usage: upload <local_path> <remote_path>")
@@ -98,7 +98,7 @@ class WindowsShell(GenericShell):
         except TerasploitShellError as exc:
             error(f"Upload failed: {exc}")
 
-    def _cmd_download(self, args):
+    def cmd_download(self, args):
         """Download a file from Windows using a PowerShell Base64 envelope."""
         if not args:
             warning("Usage: download <remote_path> [local_path]")

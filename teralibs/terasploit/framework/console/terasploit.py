@@ -2,8 +2,11 @@ import contextlib
 import os
 import readline
 
-from teralibs.terasploit.framework.console.package import DATASTORE, FRAMEWORK_CORE_OPTIONS
-from teralibs.terasploit.framework.modules.module_storage import ModuleStorage
+from teralibs.terasploit.framework.console.package import (
+    DATASTORE,
+    FRAMEWORK_CORE_OPTIONS,
+)
+from teralibs.terasploit.framework.module.container import ModuleStorage
 from teralibs.terasploit.framework.services.banner import display_banner
 from teralibs.terasploit.framework.services.printf import set_verbose, warning
 from teralibs.terasploit.framework.thread.handler import ThreadHandler
@@ -21,6 +24,7 @@ class Terasploit:
     console_toggle = True
 
     def __init__(self, verbose=False, history_length=100, silent_banner=False):
+        """Initialize shared framework state and start the console."""
         # Shared state available to all command handlers via self.*.
         self.modules = ModuleIndex()
         self.module_storage = ModuleStorage()

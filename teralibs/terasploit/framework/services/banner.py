@@ -3,7 +3,7 @@ from teralibs.terasploit.metadata import VERSION
 
 
 # Module category
-CATEGORIES = ("exploit", "auxiliary", "payload", "encoder", "post", "nop")
+CATEGORIES = ("exploit", "auxiliary", "payload", "encoder", "post")
 
 # Terasploit ASCII banner
 BANNER = f"""
@@ -34,6 +34,6 @@ def display_banner(module_list, silent=False):
     print_line(BANNER)
     print_line(
         " ",
-        f"{counts['exploit']} Exploit - {counts['auxiliary']} Auxiliary - {counts['payload']} Payload",
+        f"{counts['exploit']} exploit - {counts['auxiliary']} auxiliary - {counts['payload']} payload -",
+        f"{counts['encoder']} encoder - {counts['post']} post\n\n",
     )
-    print_line(" ", f"{counts['encoder']} Encoder - {counts['post']} Post - {counts['nop']} Nop\n\n")

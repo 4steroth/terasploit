@@ -1,20 +1,21 @@
+import contextlib
 import importlib.util
 
 from teralibs.terasploit.framework.services import tables as tbl
 from teralibs.tsf.utils.exception import ModuleInspectionError
 
 
-def _to_path(dotted):
+def to_path(dotted):
     """Convert a dotted module name to its human-readable slash form."""
     return dotted.replace(".", "/")
 
 
-def _category_of(dotted):
+def category_of(dotted):
     """Return the leading category segment of a dotted module name."""
     return dotted.split(".")[0] if "." in dotted else dotted
 
 
-def _normalise_list(value):
+def normalise_list(value):
     """Coerce an ARCH or PLATFORM class attribute to a normalised frozenset."""
     if value is None:
         return frozenset()
@@ -22,19 +23,18 @@ def _normalise_list(value):
     if isinstance(value, str):
         return frozenset({value.lower().strip()})
 
-    try:
+    with contextlib.suppress(TypeError):
         return frozenset(str(v).lower().strip() for v in value)
 
-    except TypeError:
-        return frozenset()
+    return frozenset()
 
 
-def _is_compatible(module_obj, candidate_cls, category):
+def is_compatible(module_obj, candidate_cls, category):
     """Return True when *candidate_cls* is compatible with the active *module_obj*."""
-    mod_arch = _normalise_list(getattr(module_obj, "ARCH", ["all"]))
-    mod_platform = _normalise_list(getattr(module_obj, "PLATFORM", ["all"]))
-    cand_arch = _normalise_list(getattr(candidate_cls, "ARCH", ["all"]))
-    cand_plat = _normalise_list(getattr(candidate_cls, "PLATFORM", ["all"]))
+    mod_arch = normalise_list(getattr(module_obj, "ARCH", ["all"]))
+    mod_platform = normalise_list(getattr(module_obj, "PLATFORM", ["all"]))
+    cand_arch = normalise_list(getattr(candidate_cls, "ARCH", ["all"]))
+    cand_plat = normalise_list(getattr(candidate_cls, "PLATFORM", ["all"]))
 
     # "all" on either side is a wildcard - always matches.
     arch_ok = "all" in mod_arch or "all" in cand_arch or bool(mod_arch & cand_arch)
@@ -50,11 +50,7 @@ def _is_compatible(module_obj, candidate_cls, category):
     return plat_ok
 
 
-def _filter_compatible(
-    module_paths,
-    module_obj,
-    category,
-):
+def filter_compatible(module_paths, module_obj, category):
     """Filter *module_paths* to those compatible with the active *module_obj*."""
     compatible = []
     for dotted in module_paths:
@@ -82,7 +78,7 @@ def _filter_compatible(
                 compatible.append(dotted)
                 continue
 
-            if _is_compatible(module_obj, cls, category):
+            if is_compatible(module_obj, cls, category):
                 compatible.append(dotted)
 
         except ModuleInspectionError:
@@ -91,4 +87,4 @@ def _filter_compatible(
     return compatible
 
 
-__all__ = ["_category_of", "_filter_compatible", "_is_compatible", "_normalise_list", "_to_path"]
+__all__ = ["category_of", "filter_compatible", "is_compatible", "normalise_list", "to_path"]

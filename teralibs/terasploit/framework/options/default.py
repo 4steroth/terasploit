@@ -84,20 +84,6 @@ PAYLOAD_OPTIONS = [
         OptionType.BOOL,
     ),
     Option(
-        "NopSledSize",
-        "0",
-        False,
-        "Prepend a NOP sled of this many bytes to the payload",
-        OptionType.INTEGER,
-    ),
-    Option(
-        "NopSledModule",
-        None,
-        False,
-        "Explicit nop module path for sled generation (auto-select when empty)",
-        OptionType.STRING,
-    ),
-    Option(
         "EXITFUNC",
         "process",
         True,

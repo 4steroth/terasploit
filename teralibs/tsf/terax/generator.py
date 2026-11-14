@@ -162,8 +162,8 @@ class Terax:
         arch_label = "architectures" if len(arch) > 1 else "architecture"
 
         info(f"using '{self._payload_name.replace('.', '/')}' to generate payload")
-        info(f"the selected payload targets -> '{', '.join(platforms) or 'any platform'}'")
-        info(f"the selected payload supports -> '{', '.join(arch) or 'any'}' {arch_label}")
+        info(f"the selected payload targets '{', '.join(platforms) or 'any platform'}'")
+        info(f"the selected payload supports '{', '.join(arch) or 'any'}' {arch_label}")
         info(f"the selected or preferred output format for this payload -> {self._args.format.lower()}")
 
         if bad_char_string:

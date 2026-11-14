@@ -158,7 +158,7 @@ class TableRenderer:
             self._render_row(row, widths)
 
 
-def _dotted_to_path(dotted):
+def _dottedto_path(dotted):
     """Convert a dotted module name to its slash-separated display form."""
     return dotted.replace(".", "/")
 
@@ -276,7 +276,7 @@ def modules_table(modules):
     rows = []
     for idx, dotted in enumerate(modules):
         rank = _load_module_meta(dotted)
-        display_name = _dotted_to_path(dotted)
+        display_name = _dottedto_path(dotted)
         rows.append((str(idx), display_name, rank))
 
     w_idx = max(len("#"), max(len(r[0]) for r in rows))

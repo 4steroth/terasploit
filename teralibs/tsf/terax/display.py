@@ -23,7 +23,7 @@ class TeraxDisplay:
 
     def list_payloads(self):
         """Print a formatted table of all available payload modules."""
-        items = sorted(m for m in self._modules.list_modules() if m.startswith("payload.singles") or m.startswith("payload.stagers"))
+        items = sorted(m for m in self._modules.list_modules() if m.startswith(("payload.singles", "payload.stagers")) and "generic" not in m)
         print_line(f"\nPayloads ({len(items)})")
         modules_table(items)
         print_line()

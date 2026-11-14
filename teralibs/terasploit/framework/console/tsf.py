@@ -17,6 +17,7 @@ class CompactHelpFormatter(argparse.RawDescriptionHelpFormatter):
     """RawDescriptionHelpFormatter with a tighter help-column alignment."""
 
     def __init__(self, *args, **kwargs):
+        """Configure terminal-aware help formatting."""
         kwargs.setdefault("max_help_position", 50)
 
         size = shutil.get_terminal_size(fallback=(80, 24))
@@ -29,6 +30,7 @@ class CompactHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 def _build_parser():
+    """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
         prog="teraconsole",
         formatter_class=CompactHelpFormatter,
@@ -69,13 +71,12 @@ def _build_parser():
         "-x",
         "--execute",
         metavar="CMDs",
-        help='Execute semicolon-separated commands, then drop to REPL (e.g. "use x; set Y z")',
+        help=('Execute semicolon-separated commands, then drop to REPL (e.g. "use x; set Y z")'),
     )
 
     return parser
 
 
-# Resource script runner
 def _run_resource(console, filepath):
     """Execute each non-blank, non-comment line of *filepath* as a console command."""
     if not os.path.isfile(filepath):
@@ -98,7 +99,6 @@ def _run_resource(console, filepath):
                 error(f"[rc:{lineno}] {exc}")
 
 
-# Inline command string runner
 def _run_inline(console, command_string):
     """Execute a semicolon-separated list of commands immediately."""
     for raw in command_string.split(";"):
@@ -115,7 +115,6 @@ def _run_inline(console, command_string):
             error(f"[inline] {exc}")
 
 
-# Entry point
 def main():
     """The main entry point of terasploit framework"""
     parser = _build_parser()
