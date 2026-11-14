@@ -10,8 +10,6 @@ Labels: module
 - [ ] auxiliary
 - [ ] post
 - [ ] encoder
-- [ ] evasion
-- [ ] nop
 - [ ] payload
 
 ## Target platform and architecture
