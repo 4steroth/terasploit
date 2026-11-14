@@ -64,6 +64,11 @@ class BaseShell:
         )
         info("Type 'help' for available commands. Use 'background' to detach.")
         print_line()
+        warning(
+            "The prompt may occasionally disappear because terminal input and remote "
+            "output share the same interface. This is a terminal rendering limitation, "
+            "not a session failure. As you execute command it will return on its own."
+        )
 
         try:
             self._sock.setblocking(False)
