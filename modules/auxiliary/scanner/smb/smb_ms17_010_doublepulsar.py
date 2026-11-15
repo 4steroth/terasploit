@@ -2,7 +2,7 @@ import contextlib
 import os
 from collections.abc import Sequence
 
-from impacket.smbconnection import SMB_DIALECT, SMBConnection
+from impacket import smb
 
 from teralibs.tsf.base.auxiliary import Auxiliary
 from teralibs.tsf.pex.proto.smb.client import SMBClient
@@ -41,6 +41,7 @@ class TerasploitModule(Auxiliary):
         ["URL", "https://web.archive.org/web/20170513050203/https://technet.microsoft.com/en-us/library/security/ms17-010.aspx"],
     ]
 
+    AUXILIARY_MODE: Sequence = [(0, "Check MS17-010 and Doublepulsar")]
     OPTIONS: Sequence = ["RHOST", ("RPORT", {"default": 445})]
 
     def __init__(self):
@@ -111,30 +112,37 @@ class TerasploitModule(Auxiliary):
         return "x64 (64-bit)"
 
     def check_pipes_on_vuln_host(self, ctx, conn, tree_id):
-        """Scan for pipes on host vulnerable to MS17-010."""
-
-        pipes = None
-        with (
-            contextlib.suppress(Exception),
-            open(self.named_pipes, encoding="utf-8", errors="ignore") as f,
-        ):
-            pipes = [x.strip() for x in f.readlines()]
-
-        if not pipes:
-            ctx.error(f"Could not open {self.named_pipes}")
+        """Scan for pipes on a host vulnerable to MS17-010."""
+        try:
+            with open(self.named_pipes, encoding="utf-8", errors="ignore") as file:
+                pipes = [pipe.strip() for pipe in file if pipe.strip()]
+        except OSError as exc:
+            ctx.error(f"Could not open {self.named_pipes}: {exc}")
             return
 
-        # Scan for pipes
-        ctx.info("Scanning for named pipes...")
-        for pipe in pipes:
-            with contextlib.suppress(Exception):
-                pipe_path = f"\\{pipe}"
-                fid = conn.createFile(treeId=tree_id, pathName=pipe_path, desiredAccess=0x00020089)
+        if not pipes:
+            ctx.error(f"No named pipes found in {self.named_pipes}")
+            return
 
-                # If it did not raise an exception, it's accessible.
-                ctx.success(f"{ctx.get_option('RHOST')} - '{pipe_path}' pipe exists and accessible!")
-                # Cleanup
-                conn.closeFile(tree_id, fid)
+        ctx.info("Scanning for named pipes...")
+
+        for pipe in pipes:
+            pipe = pipe.strip()
+            pipe_path = pipe if pipe.startswith("\\") else f"\\{pipe}"
+            fid = None
+
+            try:
+                with contextlib.suppress(Exception):
+                    fid = conn.nt_create_andx(
+                        tree_id,
+                        pipe_path,
+                        accessMask=0x00020089,
+                    )
+                    ctx.success(f"{ctx.get_option('RHOST')} - connected to pipe: {pipe_path}")
+            finally:
+                if fid is not None:
+                    with contextlib.suppress(Exception):
+                        conn.close(tree_id, fid)
 
     def run(self, ctx):
         """Scan for the presence of DoublePulsar from NSA."""
@@ -159,7 +167,7 @@ class TerasploitModule(Auxiliary):
             if status == "STATUS_INSUFF_SERVER_RESOURCES":
                 arch = SMBClient.dcerpc_getarch(ip)
 
-            os_name = conn.getServerOS()
+            os_name = conn.get_server_os()
             target_system = f"{os_name} - {arch} Architecture"
             ctx.success(f"The host {ip} is likely vulnerable to MS17-010 - {target_system}")
 
@@ -173,7 +181,7 @@ class TerasploitModule(Auxiliary):
                     f"Arch {self.calculate_doublepulsar_arch(signature2)}, XOR Key {self.calculate_doublepulsar_xor_key(signature1)}"
                 )
             else:
-                ctx.info(f"The host {ip} is likely not infected with doublepulsar")
+                ctx.error(f"The host {ip} is likely not infected with doublepulsar")
 
             if ctx.get_option("CHECK_PIPES"):
                 self.check_pipes_on_vuln_host(ctx, conn, tree_id)
@@ -183,32 +191,35 @@ class TerasploitModule(Auxiliary):
 
         finally:
             with contextlib.suppress(Exception):
+                conn.disconnect_tree(tree_id)
                 conn.logoff()
-                conn.close()
+
+            with contextlib.suppress(Exception):
+                conn.get_socket().close()
 
     def do_smb_setup_tree(self, ctx, ipc_share):
-        """
-        Connects to an SMB target, authenticates, and returns an
-        Impacket SMBConnection object ready for share/pipe operations.
-        """
+        """Connect to an SMB1 target, authenticate, and connect to the requested share."""
         smb_name = ctx.get_option("SMBName")
         rhost = ctx.get_option("RHOST")
         rport = int(ctx.get_option("RPORT"))
 
-        # We force the connection wrapper to ONLY negotiate legacy SMB1
-        conn = SMBConnection(smb_name, rhost, sess_port=rport, preferredDialect=SMB_DIALECT)
-        conn.login(ctx.get_option("SMBUser"), ctx.get_option("SMBPass"), ctx.get_option("SMBDomain"))
+        conn = smb.SMB(smb_name, rhost, sess_port=rport)
+
         try:
-            # Example: list root of the requested share (e.g., IPC$)
-            tree_id = conn.connectTree(ipc_share)
-            smb_server = conn.getSMBServer()
+            conn.login(
+                ctx.get_option("SMBUser"),
+                ctx.get_option("SMBPass"),
+                ctx.get_option("SMBDomain"),
+            )
+            tree_id = conn.tree_connect_andx(ipc_share)
+            uid = conn.get_uid()
+        except Exception as exc:
+            with contextlib.suppress(Exception):
+                conn.logoff()
+            with contextlib.suppress(Exception):
+                conn.get_socket().close()
 
-            # This is ignored because it is a library level error from pyright
-            uid = smb_server.get_uid()  # pyright: ignore
-
-        except Exception as e:
-            conn.logoff()
-            raise RuntimeError(f"Failed to connect to share {ipc_share}: {e}") from e
+            raise RuntimeError(f"Failed to connect to share {ipc_share}: {exc}") from exc
 
         return conn, tree_id, uid
 
@@ -216,8 +227,7 @@ class TerasploitModule(Auxiliary):
         """Request transaction with fid = 0."""
         packet = self.make_smb_trans_ms17_010(tree_id, uid)
 
-        smb = conn.getSMBServer()
-        smb_socket = smb.get_socket()
+        smb_socket = conn.get_socket()
         smb_socket.sendall(packet)
         bytes_received = smb_socket.recv(4096)
 
@@ -242,8 +252,7 @@ class TerasploitModule(Auxiliary):
         """Do smb doublepulsar probe."""
         packet = self.make_smb_trans2_doublepulsar(tree_id, uid)
 
-        smb = conn.getSMBServer()
-        smb_socket = smb.get_socket()
+        smb_socket = conn.get_socket()
         smb_socket.sendall(packet)
         bytes_received = smb_socket.recv(4096)
 
@@ -267,8 +276,7 @@ class TerasploitModule(Auxiliary):
         """Make a raw transaction packet (trans2)."""
 
         packet = Constants.SMB_TRANS2_PKT.make_struct()
-        smb = SMBClient(tree_id, uid)
-        smb.smb_defaults(packet)
+        SMBClient(tree_id, uid).smb_defaults(packet)
 
         # opcode 0x0e = SESSION_SETUP
         setup = b"\x0e\x00\x00\x00"
@@ -306,8 +314,7 @@ class TerasploitModule(Auxiliary):
         """Make a raw transaction packet."""
 
         packet = Constants.SMB_TRANS_PKT.make_struct()
-        smb = SMBClient(tree_id, uid)
-        smb.smb_defaults(packet)
+        SMBClient(tree_id, uid).smb_defaults(packet)
 
         # This evaluates precisely to: \PIPE\ followed by a null byte
         trans = b"\x5c\x50\x49\x50\x45\x5c\x00"
