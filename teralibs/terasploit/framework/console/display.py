@@ -28,7 +28,7 @@ class ConsoleDisplay:
     def cmd_show(self, args):
         """Dispatch show sub-commands to their respective display methods."""
         if not args:
-            warning("Usage: show <target>  -  options, advanced, targets, auxiliary_modes, all, exploits, payloads, auxiliary, encoders, post")
+            warning("Usage: show <target>  -  options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post")
             return
 
         sub = args[0].lower()
@@ -37,7 +37,7 @@ class ConsoleDisplay:
             "advanced": self.show_advanced,
             "evasion": self.show_evasion,
             "targets": self.show_targets,
-            "auxiliary_modes": self.show_auxiliary_modes,
+            "modes": self.show_auxiliary_modes,
             "all": self.show_category,
             "modules": self.show_category,
             "exploits": lambda: self.show_category("exploit"),
@@ -50,7 +50,7 @@ class ConsoleDisplay:
         handler = sub_dispatch.get(sub)
         if handler is None:
             warning(
-                f"Unknown show target '{sub}'.  Try: options, advanced, targets, auxiliary_modes, all, exploits, payloads, auxiliary, encoders, post."
+                f"Unknown show target '{sub}'.  Try: options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post."
             )
             return
 
