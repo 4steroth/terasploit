@@ -2,7 +2,6 @@ import base64
 import html
 import random
 import re
-import string
 import struct
 import urllib.parse
 from urllib.parse import unquote_plus
@@ -10,88 +9,23 @@ from urllib.parse import unquote_plus
 
 # Constants
 
-NUMERALS = "0123456789"
-ALPHA_UPPER = string.ascii_uppercase
-ALPHA_LOWER = string.ascii_lowercase
-ALPHANUMERIC = string.ascii_letters + NUMERALS
+ALL_CHARS = bytes(range(1, 256))
+ALPHA_LOWER = b"abcdefghijklmnopqrstuvwxyz"
+ALPHA_UPPER = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+NUMERIC = b"0123456789"
+HEX_LOWER = b"0123456789abcdef"
 
 
-class Text:
-    """Python text library."""
-
-    @staticmethod
-    def badchar_index(data, badchars):
-        """Return the index of the first bad character, or None."""
-        if not badchars:
-            return None
-
-        if isinstance(badchars, (set, frozenset)):
-            badchars = bytes(badchars)
-
-        for index, (byte,) in enumerate(struct.iter_unpack("B", data)):
-            if byte in badchars:
-                return index
-
-        return None
+class Hash:
+    """Hash integer utilities."""
 
     @staticmethod
-    def uri_decode(data):
-        """Decode a URI-encoded string."""
-        return unquote_plus(data)
-
-    @staticmethod
-    def uri_decode_bytes(data):
-        """Decode a URI-encoded bytes."""
-        if not isinstance(data, bytes):
-            return data
-
-        decoded = unquote_plus(data.decode("latin-1"))
-        return decoded.encode("latin-1")
-
-    @staticmethod
-    def uri_encode(s: str, mode: str = "hex-normal") -> str:
-        """Percent-encode a string using the specified mode."""
-        if mode == "hex-all":
-            result = urllib.parse.quote(s, safe="")
-        elif mode == "hex-noslashes":
-            result = urllib.parse.quote(s, safe="/")
-        elif mode == "hex-random":
-            result = "".join(urllib.parse.quote(c, safe="") if random.random() > 0.5 else c for c in s)
-        elif mode == "u-all":
-            result = "".join(f"%u{ord(c):04X}" for c in s)
-        elif mode == "u-noslashes":
-            result = "".join(c if c == "/" else f"%u{ord(c):04X}" for c in s)
-        elif mode == "u-normal":
-            safe = set("/-_.~")
-            result = "".join(c if c in safe else f"%u{ord(c):04X}" for c in s)
-        elif mode == "u-random":
-            result = "".join(f"%u{ord(c):04X}" if random.random() > 0.5 else c for c in s)
-        else:
-            # "hex-normal" and the fallback for unknown modes
-            result = urllib.parse.quote(s, safe="/-_.~")
-        return result
-
-    @staticmethod
-    def encode_base64(text):
-        """Encode text in base64."""
-        return base64.b64encode(text.encode()).decode()
-
-    @staticmethod
-    def strip_tags(text: str, tag, leading_whitespace) -> str:
-        """
-        Remove HTML tags from a string.
-        >>> return Text.strip_tags(html, tag=r"</?[^>]*>", leading_whitespace=r"^\\s+")
-        """
-        text = html.unescape(text)
-        text = re.compile(tag).sub("", text)
-        text = re.compile(leading_whitespace, re.MULTILINE).sub("", text)
-        return text.strip()
-
-    @staticmethod
-    def ror(val: int, cnt: int) -> int:
+    def ror(dword: int, bits: int) -> int:
         """Rotate a 32-bit unsigned integer right by cnt bits."""
-        val &= 0xFFFFFFFF
-        return ((val >> cnt) | (val << (32 - cnt))) & 0xFFFFFFFF
+        dword &= 0xFFFFFFFF
+        bits &= 31
+
+        return ((dword >> bits) | (dword << (32 - bits))) & 0xFFFFFFFF
 
     @staticmethod
     def ror13_hash(name: str | bytes) -> int:
@@ -100,7 +34,7 @@ class Text:
         hash_val = 0
 
         for byte in data:
-            hash_val = Text.ror(hash_val, 13)
+            hash_val = Hash.ror(hash_val, 13)
             hash_val += byte
 
         return hash_val
@@ -131,50 +65,189 @@ class Text:
 
         return f"0x{api_hash:08X}"
 
-    @staticmethod
-    def rand_text(length: int, bad_chars: str = "", chars: str = ALPHANUMERIC) -> str:
-        """Generates a randomized string of a given length."""
-        # Automatically unpack byte strings if passed as bad character filters
-        if isinstance(bad_chars, (bytes, bytearray)):
-            bad_chars = bad_chars.decode("utf-8", errors="ignore")
 
-        # Purge bad characters from the generation pool
-        charset = [c for c in chars if c not in bad_chars]
+class Uri:
+    """Uri text utilities"""
+
+    @staticmethod
+    def uri_decode(data):
+        """Decode a URI-encoded string."""
+        return unquote_plus(data)
+
+    @staticmethod
+    def uri_decode_bytes(data):
+        """Decode a URI-encoded bytes."""
+        if not isinstance(data, bytes):
+            return data
+
+        decoded = unquote_plus(data.decode("latin-1"))
+        return decoded.encode("latin-1")
+
+    @staticmethod
+    def uri_encode(value: str, mode: str = "hex-normal") -> str:
+        """Percent-encode a string using the specified encoding mode."""
+        if mode in ("hex-all", "hex-noslashes", "hex-normal"):
+            safe = {
+                "hex-all": "",
+                "hex-noslashes": "/",
+                "hex-normal": "/-_.~",
+            }.get(mode, "/-_.~")
+
+            return urllib.parse.quote(value, safe=safe)
+
+        if mode in ("hex-random", "u-random"):
+            unicode_mode = mode == "u-random"
+
+            def encode_random(char: str) -> str:
+                """Randomly encode a character."""
+                if random.random() <= 0.5:
+                    return char
+
+                if unicode_mode:
+                    return f"%u{ord(char):04X}"
+
+                return urllib.parse.quote(char, safe="")
+
+            return "".join(encode_random(char) for char in value)
+
+        if mode in ("u-all", "u-noslashes", "u-normal"):
+            safe = {
+                "u-all": set(),
+                "u-noslashes": {"/"},
+                "u-normal": set("/-_.~"),
+            }[mode]
+
+            return "".join(char if char in safe else f"%u{ord(char):04X}" for char in value)
+
+        return urllib.parse.quote(value, safe="/-_.~")
+
+
+class Rand:
+    """Random text utilities."""
+
+    @staticmethod
+    def to_bytes(val: bytes | str) -> bytes:
+        """Convert a string or bytes value to bytes."""
+        return val.encode("latin-1") if isinstance(val, str) else val
+
+    @staticmethod
+    def rand_char(bad: bytes | str = b"", chars: bytes = ALL_CHARS) -> bytes:
+        """Generate a random character from the specified character set."""
+        return Rand.rand_text(1, bad, chars)
+
+    @staticmethod
+    def rand_base(length: int | range, bad: bytes | str, *charsets: bytes | str) -> bytes:
+        """Generate random bytes from the supplied character sets."""
+        excluded = set(Rand.to_bytes(bad))
+        charsets_bytes = b"".join(Rand.to_bytes(charset) for charset in charsets)
+
+        charset = list(dict.fromkeys(char for char in charsets_bytes if char not in excluded))
+
         if not charset:
-            raise ValueError("Character pool exhausted after filtering bad characters.")
+            return b""
 
-        return "".join(random.choice(charset) for _ in range(length))
+        if isinstance(length, range):
+            length = random.randrange(length.start, length.stop)
 
-    @classmethod
-    def rand_text_hex(cls, length: int, bad_chars: str = "") -> str:
-        """Generates random lowercase hexadecimal strings."""
-        return cls.rand_text(length, bad_chars, chars="0123456789abcdef")
-
-    @classmethod
-    def rand_text_alphanumeric(cls, length: int, bad_chars: str = "") -> str:
-        """Generates random alphanumeric strings."""
-        return cls.rand_text(length, bad_chars, chars=ALPHANUMERIC)
-
-    @classmethod
-    def rand_text_alpha(cls, length: int, bad_chars: str = "") -> str:
-        """Generates random alphabetic lowercase/uppercase strings."""
-        return cls.rand_text(length, bad_chars, chars=string.ascii_letters)
-
-    @classmethod
-    def rand_text_numeric(cls, length: int, bad_chars: str = "") -> str:
-        """Generates random numeric-only string buffers."""
-        return cls.rand_text(length, bad_chars, chars=NUMERALS)
+        return bytes(random.choices(charset, k=length))
 
     @staticmethod
-    def to_rand_case(s: str) -> str:
-        """Randomly converts characters in a string to uppercase or lowercase."""
-        return "".join(c.upper() if random.random() > 0.5 else c.lower() for c in s)
+    def rand_text(length: int | range, bad: bytes | str = b"", chars: bytes = ALL_CHARS) -> bytes:
+        """Generate random bytes using the specified character set."""
+        return Rand.rand_base(length, bad, chars)
+
+    @staticmethod
+    def rand_text_alpha(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random alphabetic bytes."""
+        return Rand.rand_base(length, bad, ALPHA_UPPER, ALPHA_LOWER)
+
+    @staticmethod
+    def rand_text_alpha_lower(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random lowercase alphabetic bytes."""
+        return Rand.rand_base(length, bad, ALPHA_LOWER)
+
+    @staticmethod
+    def rand_text_alpha_upper(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random uppercase alphabetic bytes."""
+        return Rand.rand_base(length, bad, ALPHA_UPPER)
+
+    @staticmethod
+    def rand_text_alphanumeric(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random alphanumeric bytes."""
+        return Rand.rand_base(length, bad, ALPHA_UPPER, ALPHA_LOWER, NUMERIC)
+
+    @staticmethod
+    def rand_text_hex(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random lowercase hexadecimal bytes."""
+        return Rand.rand_base(length, bad, HEX_LOWER)
+
+    @staticmethod
+    def rand_text_numeric(length: int | range, bad: bytes | str = b"") -> bytes:
+        """Generate random numeric bytes."""
+        return Rand.rand_base(length, bad, NUMERIC)
+
+    @staticmethod
+    def rand_4byte_utf8() -> bytes:
+        """Generate a valid random four-byte UTF-8 character."""
+        codepoint = random.randint(0x10000, 0x10FFFF)
+        return struct.pack(
+            ">BBBB",
+            0xF0 | (codepoint >> 18),
+            0x80 | ((codepoint >> 12) & 0x3F),
+            0x80 | ((codepoint >> 6) & 0x3F),
+            0x80 | (codepoint & 0x3F),
+        )
+
+
+class Text(Hash, Rand, Uri):
+    """Python text library."""
+
+    @staticmethod
+    def badchar_index(data, badchars):
+        """Return the index of the first bad character, or None."""
+        if not badchars:
+            return None
+
+        if isinstance(badchars, (set, frozenset)):
+            badchars = bytes(badchars)
+
+        for index, (byte,) in enumerate(struct.iter_unpack("B", data)):
+            if byte in badchars:
+                return index
+
+        return None
+
+    @staticmethod
+    def strip_tags(text: str, tag, leading_whitespace) -> str:
+        """
+        Remove HTML tags from a string.
+        >>> return Text.strip_tags(html, tag=r"</?[^>]*>", leading_whitespace=r"^\\s+")
+        """
+        text = html.unescape(text)
+        text = re.compile(tag).sub("", text)
+        text = re.compile(leading_whitespace, re.MULTILINE).sub("", text)
+        return text.strip()
+
+    @staticmethod
+    def encode_base64(text):
+        """Encode text in base64."""
+        return base64.b64encode(text.encode()).decode()
+
+    @staticmethod
+    def xor(key: bytes, value: bytes) -> bytes:
+        """XOR a byte sequence against a repeating key."""
+        if not key or not value:
+            raise ValueError("XOR operations require non-empty keys and values.")
+
+        key_len = len(key)
+        return bytes(byte ^ key[i % key_len] for i, byte in enumerate(value))
 
     @staticmethod
     def to_hex(data: bytes, prefix: str = "\\x") -> str:
         """Converts a byte stream into an escaped hex string (e.g., \\x90\\xcc)."""
         if isinstance(data, str):
             data = data.encode("utf-8")
+
         return "".join(f"{prefix}{b:02x}" for b in data)
 
     @staticmethod
@@ -193,18 +266,3 @@ class Text:
             lines.append(f'"{hex_chunk}"')
 
         return "\n".join(lines)
-
-    @staticmethod
-    def xor(key: bytes, value: bytes) -> bytes:
-        """XORs a byte sequence against a variable-length tracking key value."""
-        if isinstance(key, str):
-            key = key.encode("utf-8")
-
-        if isinstance(value, str):
-            value = value.encode("utf-8")
-
-        if not key or not value:
-            raise ValueError("XOR operations require non-empty keys and value payloads.")
-
-        key_len = len(key)
-        return bytes(value[i] ^ key[i % key_len] for i in range(len(value)))
