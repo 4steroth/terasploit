@@ -502,7 +502,7 @@ class ConsoleLoader:
         valid_ids = [t[0] for t in items]
         if tid not in valid_ids:
             spacer = "  " if double_space_quirk else " "
-            error(f"Invalid target ID {tid}.{spacer}Valid IDs: {valid_ids}")
+            error(f"Invalid {attr_name} ID {tid}.{spacer}Valid IDs: {valid_ids}")
             return
 
         self.console.datastore.set_value(attr_name, items[tid][1] if store_tuple_value else tid, "module")
