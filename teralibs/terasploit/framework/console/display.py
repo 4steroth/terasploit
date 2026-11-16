@@ -49,9 +49,7 @@ class ConsoleDisplay:
 
         handler = sub_dispatch.get(sub)
         if handler is None:
-            warning(
-                f"Unknown show target '{sub}'.  Try: options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post."
-            )
+            warning(f"Unknown show target '{sub}'.  Try: options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post.")
             return
 
         if sub in ("modules", "exploits", "auxiliary", "payloads", "encoders", "post", "all"):
