@@ -94,7 +94,7 @@ class FindShellHandler:
 
             self._flush(sock)
 
-            token = Text.rand_text_alphanumeric(16)
+            token = Text.rand_text_alphanumeric_str(16)
             sock.sendall(f"\necho {token}\n".encode("latin-1"))
 
             response = b""
