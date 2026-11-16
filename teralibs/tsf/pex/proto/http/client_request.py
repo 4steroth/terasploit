@@ -64,7 +64,7 @@ class ClientRequest:
     Supports CGI parameter encoding, multipart form-data, chunked transfer
     encoding, header manipulation, and a range of evasion techniques.
 
-    Usage::
+    Usage:
 
         req = ClientRequest(
             {
@@ -225,9 +225,9 @@ class ClientRequest:
         for _ in range(int(self.opts["pad_get_params_count"])):
             if qstr:
                 qstr += "&"
-            qstr += self._set_encode_uri(Text.rand_text_alphanumeric(random.randint(1, 32)))
+            qstr += self._set_encode_uri(Text.rand_text_alphanumeric_str(random.randint(1, 32)))
             qstr += "="
-            qstr += self._set_encode_uri(Text.rand_text_alphanumeric(random.randint(1, 32)))
+            qstr += self._set_encode_uri(Text.rand_text_alphanumeric_str(random.randint(1, 32)))
         return qstr
 
     def _append_vars_get(self, qstr: str) -> str:
@@ -258,8 +258,8 @@ class ClientRequest:
         if not self.opts.get("pad_post_params"):
             return pstr
         for _ in range(int(self.opts["pad_post_params_count"])):
-            rand_var = Text.rand_text_alphanumeric(random.randint(1, 32))
-            rand_val = Text.rand_text_alphanumeric(random.randint(1, 32))
+            rand_var = Text.rand_text_alphanumeric_str(random.randint(1, 32))
+            rand_val = Text.rand_text_alphanumeric_str(random.randint(1, 32))
             if pstr:
                 pstr += "&"
             pstr += self._set_encode_uri(rand_var) if self.opts["encode_params"] else rand_var
@@ -345,7 +345,7 @@ class ClientRequest:
             for part in uri_str.split("/"):
                 cnt = random.randint(2, 9)
                 for _ in range(cnt):
-                    buf += "/" + Text.rand_text_alphanumeric(random.randint(1, 32))
+                    buf += "/" + Text.rand_text_alphanumeric_str(random.randint(1, 32))
                 buf += "/.." * cnt
                 buf += "/" + part
             uri_str = buf
@@ -373,10 +373,10 @@ class ClientRequest:
             ret = random.choice(["GET", "POST", "HEAD"])
 
         if self.opts.get("method_random_invalid"):
-            ret = Text.rand_text_alpha(random.randint(1, 20))
+            ret = Text.rand_text_alpha_str(random.randint(1, 20))
 
         if self.opts.get("method_random_case"):
-            ret = Text.to_rand_case(ret)
+            ret = Text.to_rand_case_str(ret)
 
         return ret
 
@@ -428,7 +428,7 @@ class ClientRequest:
             ret = f"{self.opts['proto']}/{random.choice(['1.0', '1.1'])}"
 
         if self.opts.get("version_random_invalid"):
-            ret = Text.rand_text_alphanumeric(random.randint(1, 20))
+            ret = Text.rand_text_alphanumeric_str(random.randint(1, 20))
 
         return ret + "\r\n"
 
@@ -488,8 +488,8 @@ class ClientRequest:
         if self.opts.get("pad_fake_headers"):
             for _ in range(int(self.opts["pad_fake_headers_count"])):
                 buf += self._set_formatted_header(
-                    Text.rand_text_alphanumeric(random.randint(1, 32)),
-                    Text.rand_text_alphanumeric(random.randint(1, 32)),
+                    Text.rand_text_alphanumeric_str(random.randint(1, 32)),
+                    Text.rand_text_alphanumeric_str(random.randint(1, 32)),
                 )
 
         for var, val in self.opts.get("headers", {}).items():
