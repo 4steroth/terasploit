@@ -5,7 +5,7 @@ import random
 import struct
 from collections.abc import Callable, Mapping, Sequence
 from enum import IntEnum
-from typing import Any
+from typing import Any, Literal
 
 from teralibs.tsf.core.encoder.state import BadcharError, EncoderState
 from teralibs.tsf.core.module.base import Base
@@ -507,7 +507,7 @@ class Encoder(Base):
         _state = state
         return b""
 
-    def can_avoid(self, bad_bytes):
+    def can_avoid(self, bad_bytes) -> Literal[True, False]:
         """Return True if this encoder might be able to avoid bad_bytes."""
         _bad_bytes = bad_bytes
         return True
