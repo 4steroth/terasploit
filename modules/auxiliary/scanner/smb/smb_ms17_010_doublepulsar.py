@@ -1,6 +1,7 @@
 import contextlib
 import os
 from collections.abc import Sequence
+from pathlib import Path
 
 from impacket import smb
 
@@ -45,12 +46,7 @@ class TerasploitModule(Auxiliary):
     OPTIONS: Sequence = ["RHOST", ("RPORT", {"default": 445})]
 
     def __init__(self):
-        self.named_pipes = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
-            "data",
-            "wordlists",
-            "named_pipes.txt",
-        )
+        self.named_pipes = Path(__file__).resolve().parents[4] / "data" / "wordlists" / "named_pipes.txt"
         self.register_options(
             [
                 self.opt(
