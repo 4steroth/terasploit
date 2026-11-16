@@ -2,6 +2,8 @@ import base64
 import html
 import random
 import re
+import secrets
+import string
 import struct
 import urllib.parse
 from urllib.parse import unquote_plus
@@ -14,6 +16,12 @@ ALPHA_LOWER = b"abcdefghijklmnopqrstuvwxyz"
 ALPHA_UPPER = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 NUMERIC = b"0123456789"
 HEX_LOWER = b"0123456789abcdef"
+
+ALL_CHARS_STR = string.ascii_letters + string.digits + string.punctuation
+ALPHA_UPPER_STR = string.ascii_uppercase
+ALPHA_LOWER_STR = string.ascii_lowercase
+NUMERIC_STR = string.digits
+HEX_LOWER_STR = string.hexdigits.lower()[:16]
 
 
 class Hash:
@@ -139,8 +147,8 @@ class Rand:
     def rand_base(length: int | range, bad: bytes | str, *charsets: bytes | str) -> bytes:
         """Generate random bytes from the supplied character sets."""
         excluded = set(Rand.to_bytes(bad))
-        charsets_bytes = b"".join(Rand.to_bytes(charset) for charset in charsets)
 
+        charsets_bytes = b"".join(Rand.to_bytes(charset) for charset in charsets)
         charset = list(dict.fromkeys(char for char in charsets_bytes if char not in excluded))
 
         if not charset:
@@ -150,6 +158,58 @@ class Rand:
             length = random.randrange(length.start, length.stop)
 
         return bytes(random.choices(charset, k=length))
+
+    @staticmethod
+    def rand_base_str(length: int | range, bad: str, *chars: str) -> str:
+        """Generate random text using the specified character sets."""
+        charset = "".join(chars)
+        charset = "".join(char for char in charset if char not in bad)
+
+        if not charset:
+            raise ValueError("Character set cannot be empty after excluding bad characters")
+        size = secrets.choice(range(length.start, length.stop)) if isinstance(length, range) else length
+
+        return "".join(secrets.choice(charset) for _ in range(size))
+
+    @staticmethod
+    def rand_text_str(length: int | range, bad: str = "", chars: str = ALL_CHARS_STR) -> str:
+        """Generate random text using the specified character set."""
+        return Rand.rand_base_str(length, bad, chars)
+
+    @staticmethod
+    def rand_text_alpha_str(length: int | range, bad: str = "") -> str:
+        """Generate random alphabetic text."""
+        return Rand.rand_base_str(length, bad, ALPHA_UPPER_STR, ALPHA_LOWER_STR)
+
+    @staticmethod
+    def rand_text_alpha_lower_str(length: int | range, bad: str = "") -> str:
+        """Generate random lowercase alphabetic text."""
+        return Rand.rand_base_str(length, bad, ALPHA_LOWER_STR)
+
+    @staticmethod
+    def rand_text_alpha_upper_str(length: int | range, bad: str = "") -> str:
+        """Generate random uppercase alphabetic text."""
+        return Rand.rand_base_str(length, bad, ALPHA_UPPER_STR)
+
+    @staticmethod
+    def rand_text_alphanumeric_str(length: int | range, bad: str = "") -> str:
+        """Generate random alphanumeric text."""
+        return Rand.rand_base_str(length, bad, ALPHA_UPPER_STR, ALPHA_LOWER_STR, NUMERIC_STR)
+
+    @staticmethod
+    def rand_case_str(length: int | range, bad: str = "") -> str:
+        """Generate random alphabetic text in random cases."""
+        return Rand.rand_base_str(length, bad, ALPHA_UPPER_STR, ALPHA_LOWER_STR)
+
+    @staticmethod
+    def rand_text_hex_str(length: int | range, bad: str = "") -> str:
+        """Generate random lowercase hexadecimal text."""
+        return Rand.rand_base_str(length, bad, HEX_LOWER_STR)
+
+    @staticmethod
+    def rand_text_numeric_str(length: int | range, bad: str = "") -> str:
+        """Generate random numeric text."""
+        return Rand.rand_base_str(length, bad, NUMERIC_STR)
 
     @staticmethod
     def rand_text(length: int | range, bad: bytes | str = b"", chars: bytes = ALL_CHARS) -> bytes:
@@ -266,3 +326,8 @@ class Text(Hash, Rand, Uri):
             lines.append(f'"{hex_chunk}"')
 
         return "\n".join(lines)
+
+    @staticmethod
+    def to_rand_case_str(chars) -> str:
+        """Return the text with randomly assigned character casing."""
+        return "".join(char.upper() if secrets.randbelow(2) else char.lower() for char in chars)
