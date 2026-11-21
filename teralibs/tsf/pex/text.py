@@ -263,6 +263,18 @@ class Text(Hash, Rand, Uri):
     """Python text library."""
 
     @staticmethod
+    def struct_fmt_repeat(fmt: str, count: int) -> str:
+        """Repeat a struct format while preserving its prefix."""
+        if count < 0:
+            raise ValueError("count must be non-negative")
+
+        prefix = fmt[0] if fmt and fmt[0] in "<>=@!" else ""
+        result = prefix + fmt[len(prefix) :] * count
+
+        struct.Struct(result)
+        return result
+
+    @staticmethod
     def badchar_index(data, badchars):
         """Return the index of the first bad character, or None."""
         if not badchars:
