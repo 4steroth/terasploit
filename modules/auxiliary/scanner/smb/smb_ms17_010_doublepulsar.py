@@ -2,8 +2,6 @@ import contextlib
 from collections.abc import Sequence
 from pathlib import Path
 
-from impacket import smb
-
 from teralibs.tsf.base.auxiliary import Auxiliary
 from teralibs.tsf.pex.proto.smb.client import SMBClient
 from teralibs.tsf.pex.smb.constants import Constants
@@ -11,9 +9,9 @@ from teralibs.tsf.pex.smb.exception import ErrorCode
 
 
 class TerasploitModule(Auxiliary):
-    """Detects MS17-010 vulnerabillity and the presence of DoublePulsar in Windows System."""
+    """Detects MS17-010 vulnerability and the presence of DoublePulsar in Windows System."""
 
-    NAME: str = "MS17-010 DoublePulsar Detection "
+    NAME: str = "MS17-010 Doublepulsar Detection"
     DESCRIPTION: str = (
         "This module detects the presence of the DoublePulsar backdoor on a target "
         "system by sending specially crafted SMB requests and analyzing the responses "
@@ -76,7 +74,7 @@ class TerasploitModule(Auxiliary):
             [
                 self.opt(
                     "CHECK_PIPES",
-                    True,
+                    False,
                     True,
                     "Check for named pipe on vulnerable hosts",
                     self.otype.BOOL,
@@ -91,22 +89,19 @@ class TerasploitModule(Auxiliary):
             ]
         )
 
-    # https://zerosum0x0.blogspot.com/2017/04/doublepulsar-initial-smb-backdoor-ring.html
     def calculate_doublepulsar_xor_key(self, s):
         """Calculates the 32-bit DoublePulsar stream cipher XOR key from the SMB Signature."""
         x = 2 * s ^ (((s & 0xFF00 | (s << 16)) << 8) | (((s >> 16) | s & 0xFF0000) >> 8))
-        x = x & 0xFFFFFFFF  # this line was added just to truncate to 32 bits
+        x = x & 0xFFFFFFFF
         return x
 
-    # The arch is adjacent to the XOR key in the SMB signature
     def calculate_doublepulsar_arch(self, s):
         """Deduces the remote operating system architecture from the SMB Signature field."""
         if s & 0xFFFFFFFF00000000 == 0:
             return "x86 (32-bit)"
-
         return "x64 (64-bit)"
 
-    def check_pipes_on_vuln_host(self, ctx, conn, tree_id):
+    def check_pipes_on_vuln_host(self, ctx, conn):
         """Scan for pipes on a host vulnerable to MS17-010."""
         try:
             with open(self.named_pipes, encoding="utf-8", errors="ignore") as file:
@@ -122,14 +117,13 @@ class TerasploitModule(Auxiliary):
         ctx.info("Scanning for named pipes...")
 
         for pipe in pipes:
-            pipe = pipe.strip()
             pipe_path = pipe if pipe.startswith("\\") else f"\\{pipe}"
             fid = None
 
             try:
                 with contextlib.suppress(Exception):
                     fid = conn.nt_create_andx(
-                        tree_id,
+                        conn.default_tid,
                         pipe_path,
                         accessMask=0x00020089,
                     )
@@ -137,68 +131,78 @@ class TerasploitModule(Auxiliary):
             finally:
                 if fid is not None:
                     with contextlib.suppress(Exception):
-                        conn.close(tree_id, fid)
+                        conn.close(conn.default_tid, fid)
 
     def run(self, ctx):
         """Scan for the presence of DoublePulsar from NSA."""
         ip = ctx.get_option("RHOST")
         ipc_share = f"\\\\{ip}\\IPC$"
 
-        # Get the tree id
         try:
-            conn, tree_id, uid = self.do_smb_setup_tree(ctx, ipc_share)
+            conn = SMBClient(
+                ctx.get_option("SMBName"),
+                ctx.get_option("RHOST"),
+                timeout=8,
+            )
+            conn.login(
+                ctx.get_option("SMBUser"),
+                ctx.get_option("SMBPass"),
+                ctx.get_option("SMBDomain"),
+            )
+            conn.default_tid = conn.connect_tree(ipc_share)
 
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
             ctx.error(f"Error: {exc}")
             return
 
-        ctx.info(f"Connected to {ipc_share} with TID = {tree_id}")
-        try:
-            status = self.do_smb_ms17_010_probe(tree_id, uid, conn)
-            ctx.info(f"Received {status} with FID = 0")
+        ctx.info(f"Connected to {ipc_share} with TID = {conn.default_tid}")
 
-            # Check arch
-            arch = None
+        try:
+            status = self.do_smb_ms17_010_probe(conn)
+            ctx.info(f"Received {status} with FID = {conn.last_fid}")
+
             if status == "STATUS_INSUFF_SERVER_RESOURCES":
                 arch = SMBClient.dcerpc_getarch(ip)
+                os_name = conn.get_server_os()
+                target_system = f"{os_name} - {arch} Architecture"
+                ctx.success(f"The host {ip} is likely vulnerable to MS17-010 - {target_system}")
 
-            os_name = conn.get_server_os()
-            target_system = f"{os_name} - {arch} Architecture"
-            ctx.success(f"The host {ip} is likely vulnerable to MS17-010 - {target_system}")
+                ctx.info("Scanning for the presence of DoublePulsar...")
+                code, signature1, signature2 = self.do_smb_doublepulsar_probe(conn)
 
-            # Checking for the presence of doublepulsar in the system...
-            ctx.info("Scanning for the presence of DoublePulsar...")
-            code, signature1, signature2 = self.do_smb_doublepulsar_probe(tree_id, uid, conn)
+                if code == 0x51:
+                    ctx.info(
+                        f"The host {ip} is likely infected with DoublePulsar - "
+                        f"Arch {self.calculate_doublepulsar_arch(signature2)}, "
+                        f"XOR Key {self.calculate_doublepulsar_xor_key(signature1)}"
+                    )
+                else:
+                    ctx.warning(f"The host {ip} is likely not infected with DoublePulsar")
 
-            if code == 0x51:
-                ctx.info(
-                    f"The host {ip} is likey infected with doublepulsar - "
-                    f"Arch {self.calculate_doublepulsar_arch(signature2)}, XOR Key {self.calculate_doublepulsar_xor_key(signature1)}"
-                )
+                if ctx.get_option("CHECK_PIPES"):
+                    self.check_pipes_on_vuln_host(ctx, conn)
+
+            elif status in ("STATUS_ACCESS_DENIED", "STATUS_INVALID_HANDLE"):
+                ctx.error(f"The host {ip} does NOT appear vulnerable to MS17-010")
+
             else:
-                ctx.error(f"The host {ip} is likely not infected with doublepulsar")
-
-            if ctx.get_option("CHECK_PIPES"):
-                self.check_pipes_on_vuln_host(ctx, conn, tree_id)
+                ctx.error(f"Unable to determine vulnerability status — received: {status}")
 
         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
             ctx.error(f"Error: {exc}")
 
         finally:
             with contextlib.suppress(Exception):
-                conn.disconnect_tree(tree_id)
+                conn.disconnect_tree(conn.default_tid)
                 conn.logoff()
-
             with contextlib.suppress(Exception):
                 conn.get_socket().close()
 
     def do_smb_setup_tree(self, ctx, ipc_share):
-        """Connect to an SMB1 target, authenticate, and connect to the requested share."""
-        smb_name = ctx.get_option("SMBName")
-        rhost = ctx.get_option("RHOST")
-        rport = int(ctx.get_option("RPORT"))
+        """Connect to an SMB1 target using SMBClient, authenticate, and connect to the share."""
 
-        conn = smb.SMB(smb_name, rhost, sess_port=rport)
+        # SMBClient is required here — smb_defaults() must pull from an established session.
+        conn = SMBClient(ctx.get_option("SMBName"), ctx.get_option("RHOST"), timeout=8)
 
         try:
             conn.login(
@@ -206,89 +210,81 @@ class TerasploitModule(Auxiliary):
                 ctx.get_option("SMBPass"),
                 ctx.get_option("SMBDomain"),
             )
-            tree_id = conn.tree_connect_andx(ipc_share)
+            tree_id = conn.connect_tree(ipc_share)
             uid = conn.get_uid()
         except Exception as exc:
             with contextlib.suppress(Exception):
-                conn.logoff()
-            with contextlib.suppress(Exception):
-                conn.get_socket().close()
-
+                conn.disconnect()
             raise RuntimeError(f"Failed to connect to share {ipc_share}: {exc}") from exc
 
         return conn, tree_id, uid
 
-    def do_smb_ms17_010_probe(self, tree_id, uid, conn):
-        """Request transaction with fid = 0."""
-        packet = self.make_smb_trans_ms17_010(tree_id, uid)
+    def do_smb_ms17_010_probe(self, conn):
+        """Send a TRANS request with FID=0 and return the NT status string."""
+        packet = self.make_smb_trans_ms17_010(conn)
 
         smb_socket = conn.get_socket()
         smb_socket.sendall(packet)
         bytes_received = smb_socket.recv(4096)
 
+        # Raw socket receive includes 4-byte NetBIOS session header — strip it.
         smb_data = bytes_received[4:]
 
-        # WordCount sits at byte 32 of the fixed SMB header. An error response
-        # returns WordCount=0 — no TRANS parameter block follows. The framework raises.
-        # Guard here so SMB_TRANS_RES_HDR_PKT only runs on responses that have a body.
-        word_count = smb_data[32] if len(smb_data) > 32 else 0
-        smb_error = ErrorCode()
+        # SMB_TRANS_RES_HDR_PKT needs at least SMB_HDR (33) + TRANS fields (22) = 55 bytes.
+        # Shorter responses are bare error headers — parse with SMB_BASE_HDR_PKT instead.
+        smb_trans_res_min = Constants.SMB_TRANS_RES_PKT_LENGTH
 
-        if word_count == 0:
+        if len(smb_data) < smb_trans_res_min:
             base = Constants.SMB_BASE_HDR_PKT.make_struct()
             base.from_s(smb_data)
-            return smb_error.get_error(base["SMB"]["ErrorClass"])
+            return ErrorCode().get_error(base["SMB"]["ErrorClass"])
 
-        response = Constants.SMB_TRANS_RES_HDR_PKT.make_struct()
-        response.from_s(smb_data)
-        return smb_error.get_error(response["SMB"]["ErrorClass"])
+        response_pkt = Constants.SMB_TRANS_RES_HDR_PKT.make_struct()
+        response_pkt.from_s(smb_data)
+        return ErrorCode().get_error(response_pkt["SMB"]["ErrorClass"])
 
-    def do_smb_doublepulsar_probe(self, tree_id, uid, conn):
-        """Do smb doublepulsar probe."""
-        packet = self.make_smb_trans2_doublepulsar(tree_id, uid)
+    def do_smb_doublepulsar_probe(self, conn):
+        """Send a TRANS2 knock and return (multiplex_id, signature1, signature2)."""
+        packet = self.make_smb_trans2_doublepulsar(conn)
 
         smb_socket = conn.get_socket()
         smb_socket.sendall(packet)
         bytes_received = smb_socket.recv(4096)
 
+        # Raw socket receive includes 4-byte NetBIOS session header — strip it.
         smb_data = bytes_received[4:]
-        word_count = smb_data[32] if len(smb_data) > 32 else 0
 
-        if word_count == 0:
+        smb_trans_res_min = Constants.SMB_TRANS_RES_PKT_LENGTH
+
+        if len(smb_data) < smb_trans_res_min:
             base = Constants.SMB_BASE_HDR_PKT.make_struct()
             base.from_s(smb_data)
             return base["SMB"]["MultiplexID"], base["SMB"]["Signature1"], base["SMB"]["Signature2"]
 
-        response = Constants.SMB_TRANS_RES_HDR_PKT.make_struct()
-        response.from_s(smb_data)
+        response_pkt = Constants.SMB_TRANS_RES_HDR_PKT.make_struct()
+        response_pkt.from_s(smb_data)
         return (
-            response["SMB"]["MultiplexID"],
-            response["SMB"]["Signature1"],
-            response["SMB"]["Signature2"],
+            response_pkt["SMB"]["MultiplexID"],
+            response_pkt["SMB"]["Signature1"],
+            response_pkt["SMB"]["Signature2"],
         )
 
-    def make_smb_trans2_doublepulsar(self, tree_id, uid):
-        """Make a raw transaction packet (trans2)."""
-
+    def make_smb_trans2_doublepulsar(self, conn):
+        """Build a raw TRANS2 SESSION_SETUP packet for the DoublePulsar knock."""
         packet = Constants.SMB_TRANS2_PKT.make_struct()
-        SMBClient(tree_id, uid).smb_defaults(packet)
+
+        # Pull UID, TID, PID, MID from the established session.
+        conn.smb_defaults(packet["Payload"]["SMB"])
 
         # opcode 0x0e = SESSION_SETUP
         setup = b"\x0e\x00\x00\x00"
-        setup_count = 1  # 1 word
-        trans = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        setup_count = 1
+        trans = b"\x00" * 12
 
-        # calculate offsets to the SetupData payload
-        base_offset = len(packet.to_bytes()) + len(setup) - 4
-        param_offset = base_offset + len(trans)
-        _data_offset = param_offset  # + 0
-
-        # packet baselines
         packet["Payload"]["SMB"]["Command"] = Constants.SMB_COM_TRANSACTION2
         packet["Payload"]["SMB"]["Flags1"] = 0x18
         packet["Payload"]["SMB"]["MultiplexID"] = 65
         packet["Payload"]["SMB"]["Flags2"] = 0xC007
-        packet["Payload"]["SMB"]["TreeID"] = tree_id
         packet["Payload"]["SMB"]["WordCount"] = 14 + setup_count
 
         packet["Payload"]["Timeout"] = 0x00A4D9A6
@@ -298,43 +294,37 @@ class TerasploitModule(Auxiliary):
         packet["Payload"]["DataCountMax"] = 0
         packet["Payload"]["ParamOffset"] = 66
         packet["Payload"]["DataOffset"] = 78
-
         packet["Payload"]["SetupCount"] = setup_count
         packet["Payload"]["SetupData"] = setup
         packet["Payload"]["Payload"] = trans
 
         return packet.to_bytes()
 
-    def make_smb_trans_ms17_010(self, tree_id, uid):
-        """Make a raw transaction packet."""
-
+    def make_smb_trans_ms17_010(self, conn):
+        """Build a raw TRANS PeekNamedPipe packet targeting FID=0 on \\PIPE\\."""
         packet = Constants.SMB_TRANS_PKT.make_struct()
-        SMBClient(tree_id, uid).smb_defaults(packet)
 
-        # This evaluates precisely to: \PIPE\ followed by a null byte
-        trans = b"\x5c\x50\x49\x50\x45\x5c\x00"
+        # Pull UID, TID, PID, MID from the established session.
+        conn.smb_defaults(packet["Payload"]["SMB"])
 
-        # Setup definition (PeekNamedPipe opcode 0x23, FID 0)
-        setup = b"\x23\x00\x00\x00"  # 4 bytes
-        setup_count = 2  # 2 words
+        # PeekNamedPipe opcode 0x23, FID=0
+        setup = b"\x23\x00\x00\x00"
+        setup_count = 2
+        trans = b"\x5c\x50\x49\x50\x45\x5c\x00"  # \PIPE\<null>
 
-        # Calculate offsets to the SetupData payload
         base_offset = len(packet.to_bytes()) + len(setup) - 4
         param_offset = base_offset + len(trans)
-        data_offset = param_offset  # + 0
+        data_offset = param_offset
 
         packet["Payload"]["SMB"]["Command"] = Constants.SMB_COM_TRANSACTION
         packet["Payload"]["SMB"]["Flags1"] = 0x18
-        packet["Payload"]["SMB"]["Flags2"] = 0x2801  # 0xc803 would unicode
-        packet["Payload"]["SMB"]["TreeID"] = tree_id
+        packet["Payload"]["SMB"]["Flags2"] = 0x2801
         packet["Payload"]["SMB"]["WordCount"] = 14 + setup_count
 
         packet["Payload"]["ParamCountMax"] = 0xFFFF
         packet["Payload"]["DataCountMax"] = 0xFFFF
         packet["Payload"]["ParamOffset"] = param_offset
         packet["Payload"]["DataOffset"] = data_offset
-
-        # actual magic: PeekNamedPipe FID=0, \PIPE\
         packet["Payload"]["SetupCount"] = setup_count
         packet["Payload"]["SetupData"] = setup
         packet["Payload"]["Payload"] = trans
