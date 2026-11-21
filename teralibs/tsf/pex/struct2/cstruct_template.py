@@ -111,7 +111,7 @@ class CStructInstance:
             if source_field == "Payload" and isinstance(inner_payload, bytes):
                 kwargs[target_field] = len(inner_payload)
 
-    def from_s(self, data: bytes):
+    def from_s(self, data):
         """Parses a raw buffer into this instance, overwriting its field values."""
         self.parse_from(bytes(data), 0)
         return self
@@ -138,7 +138,16 @@ class CStructInstance:
             elif f_type in ("string", "template"):
                 size = self._resolve_size(field, parsed, len(data) - offset)
                 self._require(data, offset, size, f_name)
-                self._values[f_name] = data[offset : offset + size]
+
+                if f_type == "template" and isinstance(field[2], CStructTemplate):
+                    # Payload field carries a nested CStructTemplate: parse recursively
+                    # so callers receive a CStructInstance, not raw bytes.
+                    nested = field[2].make_struct()
+                    nested.parse_from(data, offset)
+                    self._values[f_name] = nested
+                else:
+                    self._values[f_name] = data[offset : offset + size]
+
                 offset += size
 
             else:
