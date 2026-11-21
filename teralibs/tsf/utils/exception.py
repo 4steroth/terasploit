@@ -54,6 +54,10 @@ class ExploitCleanupError(TerasploitException):
     """Raised when an error occurs during exploit cleanup."""
 
 
+class ExploitKillHandler(TerasploitException):
+    """Raised when an exploit is done but no session is supposed to start."""
+
+
 class ValidationError(TerasploitException):
     """Raised when validation fails."""
 
