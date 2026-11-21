@@ -14,6 +14,7 @@ from teralibs.terasploit.framework.services.printf import (
     RED,
     RESET,
     YELLOW,
+    debug,
     error,
     info,
     print_line,
@@ -216,6 +217,8 @@ class SessionsCommands:
             "success": success,
             "error": error,
             "warning": warning,
+            "debug": debug,
+            "print_line": print_line,
         }
 
         for event in self.console.thread_handler.output_bus.drain():

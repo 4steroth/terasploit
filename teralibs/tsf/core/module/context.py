@@ -62,6 +62,14 @@ class ExploitContext:
         """Emit an error log message."""
         self.bus.emit(self.job_id, "error", message)
 
+    def debug(self, message) -> None:
+        """Emit a debug log message."""
+        self.bus.emit(self.job_id, "debug", message)
+
+    def print_line(self, message) -> None:
+        """Emit a raw line with no prefix or level decoration."""
+        self.bus.emit(self.job_id, "print_line", message)
+
     def get_target(self):
         """Return the current set value for exploit target."""
         return self.datastore.get_value("TARGET")
@@ -252,6 +260,14 @@ class PostContext:
         """Emit an error log message."""
         self.bus.emit(self.job_id, "error", message)
 
+    def debug(self, message) -> None:
+        """Emit a debug log message."""
+        self.bus.emit(self.job_id, "debug", message)
+
+    def print_line(self, message) -> None:
+        """Emit a raw line with no prefix or level decoration."""
+        self.bus.emit(self.job_id, "print_line", message)
+
     def get_option(self, name: str) -> object:
         """Return the current value of option *name*."""
         return self.datastore.get_value(name)
@@ -289,6 +305,14 @@ class AuxiliaryContext:
     def error(self, message: str) -> None:
         """Emit an error log message."""
         self.bus.emit(self.job_id, "error", message)
+
+    def debug(self, message) -> None:
+        """Emit a debug log message."""
+        self.bus.emit(self.job_id, "debug", message)
+
+    def print_line(self, message) -> None:
+        """Emit a raw line with no prefix or level decoration."""
+        self.bus.emit(self.job_id, "print_line", message)
 
     def get_option(self, name: str) -> object:
         """Return the current value of option *name*."""

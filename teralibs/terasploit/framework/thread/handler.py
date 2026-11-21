@@ -47,6 +47,14 @@ class ModuleContext:
         """Emit an error log message."""
         self.bus.emit(self.job_id, "error", message)
 
+    def debug(self, message):
+        """Emit a debug log message."""
+        self.bus.emit(self.job_id, "debug", message)
+
+    def print_line(self, message):
+        """Emit a raw line with no prefix or level decoration."""
+        self.bus.emit(self.job_id, "print_line", message)
+
 
 @dataclass
 class _TaskRecord:
