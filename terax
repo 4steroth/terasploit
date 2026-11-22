@@ -16,7 +16,7 @@ if ROOT not in sys.path:
 try:
     # Import the main console entry point inside a try block
     # to catch KeyboardInterrupt and exit gracefully.
-    from extension.terax.generator import main as terax_main
+    from libs.terax.generator import main as terax_main
 
 except KeyboardInterrupt:
     # Gracefully handle Ctrl+C at the top level to avoid raw tracebacks

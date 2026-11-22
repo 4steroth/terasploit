@@ -1,4 +1,4 @@
-from extension.terax.nops.x86 import X86Nop
+from libs.terax.nops.x86 import X86Nop
 
 
 class X64Nop(X86Nop):

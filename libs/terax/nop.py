@@ -1,4 +1,4 @@
-from extension.terax.nops.registry import NOP_REGISTRY
+from libs.terax.nops.registry import NOP_REGISTRY
 
 
 class NopGenerator:

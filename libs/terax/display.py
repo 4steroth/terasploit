@@ -1,8 +1,8 @@
 import shutil
 import textwrap
 
-from extension.terax.formatter import FORMATTERS
-from extension.terax.nop import NopGenerator
+from libs.terax.formatter import FORMATTERS
+from libs.terax.nop import NopGenerator
 from terasploit.options.storage import OPTION_REGISTRY
 from terasploit.ui.printf import print_line
 from terasploit.ui.tables import modules_table

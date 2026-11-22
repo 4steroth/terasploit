@@ -2,16 +2,16 @@ import sys
 import traceback
 from datetime import datetime
 
-from extension.terax.cli import TeraxCLI
-from extension.terax.compat import CompatChecker
-from extension.terax.context import TeraxContext
-from extension.terax.display import TeraxDisplay
-from extension.terax.encoder import TeraxEncoder
-from extension.terax.formatter import FORMATTERS
-from extension.terax.nop import NopGenerator
-from extension.terax.options import OptionBuilder
-from extension.terax.output import TeraxOutput
-from extension.terax.payload import PayloadResolver
+from libs.terax.cli import TeraxCLI
+from libs.terax.compat import CompatChecker
+from libs.terax.context import TeraxContext
+from libs.terax.display import TeraxDisplay
+from libs.terax.encoder import TeraxEncoder
+from libs.terax.formatter import FORMATTERS
+from libs.terax.nop import NopGenerator
+from libs.terax.options import OptionBuilder
+from libs.terax.output import TeraxOutput
+from libs.terax.payload import PayloadResolver
 from libs.poly import EncodingError
 from terasploit.payload.badchars import BadCharFilter
 from terasploit.ui.printf import (

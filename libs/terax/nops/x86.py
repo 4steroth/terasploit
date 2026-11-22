@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 
-from extension.terax.nops.base import FixedWidthNop
+from libs.terax.nops.base import FixedWidthNop
 
 
 class X86Nop(FixedWidthNop):

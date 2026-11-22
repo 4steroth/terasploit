@@ -1,11 +1,11 @@
-from extension.terax.nops.aarch64 import AArch64Nop
-from extension.terax.nops.arm import ArmA32Nop, Thumb2Nop, ThumbNop
-from extension.terax.nops.mips import Mips32Nop, Mips64Nop
-from extension.terax.nops.powerpc import PowerPC32Nop, PowerPC64Nop
-from extension.terax.nops.riscv import RiscV32Nop, RiscV64Nop
-from extension.terax.nops.sparc import Sparc32Nop, Sparc64Nop
-from extension.terax.nops.x64 import X64Nop
-from extension.terax.nops.x86 import X86Nop
+from libs.terax.nops.aarch64 import AArch64Nop
+from libs.terax.nops.arm import ArmA32Nop, Thumb2Nop, ThumbNop
+from libs.terax.nops.mips import Mips32Nop, Mips64Nop
+from libs.terax.nops.powerpc import PowerPC32Nop, PowerPC64Nop
+from libs.terax.nops.riscv import RiscV32Nop, RiscV64Nop
+from libs.terax.nops.sparc import Sparc32Nop, Sparc64Nop
+from libs.terax.nops.x64 import X64Nop
+from libs.terax.nops.x86 import X86Nop
 
 
 NOP_REGISTRY = {
