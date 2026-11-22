@@ -29,7 +29,7 @@ dependencies = ["impacket", "paramiko"]
 # Script Distribution (PEP 517 Console Entry Points)
 [project.scripts]
 teraconsole = "terasploit.console.tsf:main"
-terax = "extension.terax.generator:main"
+terax = "libs.terax.generator:main"
 
 
 # Global Ruff Settings
