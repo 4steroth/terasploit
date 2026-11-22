@@ -2,10 +2,10 @@ import contextlib
 from collections.abc import Sequence
 from pathlib import Path
 
-from teralibs.tsf.base.auxiliary import Auxiliary
-from teralibs.tsf.pex.proto.smb.client import SMBClient
-from teralibs.tsf.pex.smb.constants import Constants
-from teralibs.tsf.pex.smb.exception import ErrorCode
+from libs.proto.smb.client import SMBClient
+from libs.smb.constants import Constants
+from libs.smb.exception import ErrorCode
+from terasploit.module.auxiliary import Auxiliary
 
 
 class TerasploitModule(Auxiliary):

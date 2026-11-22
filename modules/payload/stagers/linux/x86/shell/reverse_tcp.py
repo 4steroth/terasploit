@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
-from teralibs.tsf.core.payload.linux.x86.reverse_tcp import ReverseTcpX86
+from extension.payload.linux.x86.reverse_tcp import ReverseTcpX86
+from terasploit.module.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
 
 
 class TerasploitModule(ReverseTcpX86, Payload):
@@ -9,7 +9,7 @@ class TerasploitModule(ReverseTcpX86, Payload):
 
     NAME: str = "Linux x86 Reverse TCP Stager"
     DESCRIPTION: str = (
-        "Linux IA-32 stager that opens a reverse TCP channel to the attacker and executes the companion stage delivered by the framework."
+        "Linux IA-32 stager that opens a reverse TCP channel to the attacker and executes the companion stage delivered by the terasploit."
     )
     AUTHOR: Sequence = ["4steroth"]
     LICENSE: str = "BSD-3-CLAUSE"

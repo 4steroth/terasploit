@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.post import PLATFORM_LINUX, PLATFORM_UNIX, PLATFORM_WINDOWS, Post
+from terasploit.module.post import PLATFORM_LINUX, PLATFORM_UNIX, PLATFORM_WINDOWS, Post
 
 
 class TerasploitModule(Post):

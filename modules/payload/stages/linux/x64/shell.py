@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_X64, PLATFORM_LINUX, STAGE, Payload
+from terasploit.module.payload import ARCH_X64, PLATFORM_LINUX, STAGE, Payload
 
 
 class TerasploitModule(Payload):

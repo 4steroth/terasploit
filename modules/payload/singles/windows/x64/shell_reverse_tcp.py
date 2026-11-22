@@ -2,14 +2,14 @@ import socket
 import struct
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.payload import (
+from libs.text import Text
+from terasploit.module.payload import (
     ARCH_X64,
     PLATFORM_WINDOWS,
     SINGLE,
     Payload,
     PayloadHandler,
 )
-from teralibs.tsf.pex.text import Text
 
 
 class TerasploitModule(Payload):

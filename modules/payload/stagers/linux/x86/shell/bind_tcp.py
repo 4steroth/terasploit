@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
-from teralibs.tsf.core.payload.linux.x86.bind_tcp import BindTcpX86
+from extension.payload.linux.x86.bind_tcp import BindTcpX86
+from terasploit.module.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
 
 
 class TerasploitModule(BindTcpX86, Payload):

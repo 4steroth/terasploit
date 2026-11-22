@@ -2,10 +2,10 @@ import struct
 from collections import namedtuple
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.encoder import ARCH_X86, EncoderError, EncoderRank
-from teralibs.tsf.core.encoder.xor_additive_feedback import XorAdditiveFeedback
-from teralibs.tsf.pex.architecture.x86 import ARCHX86
-from teralibs.tsf.pex.poly import EncodingError, LogicalBlock, LogicalRegisterX86, SymbolicBlock
+from extension.encoder.xor_additive_feedback import XorAdditiveFeedback
+from libs.architecture.x86 import ARCHX86
+from libs.poly import EncodingError, LogicalBlock, LogicalRegisterX86, SymbolicBlock
+from terasploit.module.encoder import ARCH_X86, EncoderError, EncoderRank
 
 
 # Groups the three register references that every block-building helper needs,

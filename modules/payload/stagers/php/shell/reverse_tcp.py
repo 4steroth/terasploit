@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_PHP, PLATFORM_PHP, STAGER, PayloadHandler
-from teralibs.tsf.core.payload.php.reverse_tcp import PHPReverseTCP
+from extension.payload.php.reverse_tcp import PHPReverseTCP
+from terasploit.module.payload import ARCH_PHP, PLATFORM_PHP, STAGER, PayloadHandler
 
 
 class TerasploitModule(PHPReverseTCP):

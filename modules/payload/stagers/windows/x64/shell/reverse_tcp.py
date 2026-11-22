@@ -1,13 +1,13 @@
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.payload import (
+from extension.payload.windows.x64.reverse_tcp_x64 import ReverseTcpX64
+from terasploit.module.payload import (
     ARCH_X64,
     PLATFORM_WINDOWS,
     STAGER,
     Payload,
     PayloadHandler,
 )
-from teralibs.tsf.core.payload.windows.x64.reverse_tcp_x64 import ReverseTcpX64
 
 
 class TerasploitModule(ReverseTcpX64, Payload):

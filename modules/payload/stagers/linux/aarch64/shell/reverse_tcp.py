@@ -1,13 +1,13 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import (
+from extension.payload.linux.aarch64.reverse_tcp import ReverseTcpAarch64
+from terasploit.module.payload import (
     ARCH_AARCH64,
     PLATFORM_LINUX,
     STAGER,
     Payload,
     PayloadHandler,
 )
-from teralibs.tsf.core.payload.linux.aarch64.reverse_tcp import ReverseTcpAarch64
 
 
 class TerasploitModule(ReverseTcpAarch64, Payload):
@@ -15,7 +15,7 @@ class TerasploitModule(ReverseTcpAarch64, Payload):
 
     NAME: str = "Linux AArch64 Reverse TCP Stager"
     DESCRIPTION: str = (
-        "Linux AArch64 (ARM64) stager that opens a reverse TCP channel to the attacker and executes the companion stage delivered by the framework."
+        "Linux AArch64 (ARM64) stager that opens a reverse TCP channel to the attacker and executes the companion stage delivered by the terasploit."
     )
     AUTHOR: Sequence = ["4steroth"]
     LICENSE: str = "BSD-3-CLAUSE"

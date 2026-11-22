@@ -1,8 +1,8 @@
 import struct
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_X64, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
-from teralibs.tsf.core.payload.linux.x64.prepends import LinuxX64Prepends
+from extension.payload.linux.x64.prepends import LinuxX64Prepends
+from terasploit.module.payload import ARCH_X64, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
 
 
 class TerasploitModule(LinuxX64Prepends, Payload):

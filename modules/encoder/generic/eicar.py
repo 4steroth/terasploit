@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.encoder import Encoder, EncoderRank, EncoderResult
+from terasploit.module.encoder import Encoder, EncoderRank, EncoderResult
 
 
 class TerasploitModule(Encoder):

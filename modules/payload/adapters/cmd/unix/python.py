@@ -2,7 +2,8 @@ import importlib
 import shlex
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import (
+from extension.payload.python.python_base import create_exec_stub
+from terasploit.module.payload import (
     ADAPTER,
     ARCH_CMD,
     PLATFORM_LINUX,
@@ -10,7 +11,6 @@ from teralibs.tsf.base.payload import (
     Payload,
     PayloadHandler,
 )
-from teralibs.tsf.core.payload.python.python_base import create_exec_stub
 
 
 class TerasploitModule(Payload):

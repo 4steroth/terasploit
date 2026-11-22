@@ -1,13 +1,13 @@
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.payload import (
+from extension.payload.windows.x86.bind_tcp_x86 import BindTcpX86
+from terasploit.module.payload import (
     ARCH_X86,
     PLATFORM_WINDOWS,
     STAGER,
     Payload,
     PayloadHandler,
 )
-from teralibs.tsf.core.payload.windows.x86.bind_tcp_x86 import BindTcpX86
 
 
 class TerasploitModule(BindTcpX86, Payload):

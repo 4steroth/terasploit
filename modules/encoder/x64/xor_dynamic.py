@@ -1,8 +1,8 @@
 import random
 from collections.abc import Sequence, Set as AbstractSet
 
-from teralibs.tsf.base.encoder import ARCH_X64, Encoder, EncoderRank, EncoderResult
-from teralibs.tsf.core.encoder.xor_dynamic import XorDynamic
+from extension.encoder.xor_dynamic import XorDynamic
+from terasploit.module.encoder import ARCH_X64, Encoder, EncoderRank, EncoderResult
 
 
 class TerasploitModule(XorDynamic, Encoder):

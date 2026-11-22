@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_PYTHON, PLATFORM_PYTHON, STAGER, PayloadHandler
-from teralibs.tsf.core.payload.python.reverse_tcp import PythonReverseTCP
+from extension.payload.python.reverse_tcp import PythonReverseTCP
+from terasploit.module.payload import ARCH_PYTHON, PLATFORM_PYTHON, STAGER, PayloadHandler
 
 
 class TerasploitModule(PythonReverseTCP):

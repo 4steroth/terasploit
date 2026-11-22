@@ -1,7 +1,7 @@
 import struct
 from collections.abc import Sequence
 
-from teralibs.tsf.base.payload import ARCH_PYTHON, PLATFORM_PYTHON, STAGE, Payload
+from terasploit.module.payload import ARCH_PYTHON, PLATFORM_PYTHON, STAGE, Payload
 
 
 class TerasploitModule(Payload):

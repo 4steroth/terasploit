@@ -16,7 +16,7 @@ if ROOT not in sys.path:
 try:
     # Import the main console entry point inside a try block
     # to catch KeyboardInterrupt and exit gracefully.
-    from teralibs.terasploit.framework.console.tsf import main as terasploit_console
+    from terasploit.console.tsf import main as terasploit_console
 
 except KeyboardInterrupt:
     # Gracefully handle Ctrl+C at the top level to avoid raw tracebacks
