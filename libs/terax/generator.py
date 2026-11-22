@@ -2,6 +2,7 @@ import sys
 import traceback
 from datetime import datetime
 
+from libs.poly import EncodingError
 from libs.terax.cli import TeraxCLI
 from libs.terax.compat import CompatChecker
 from libs.terax.context import TeraxContext
@@ -12,7 +13,6 @@ from libs.terax.nop import NopGenerator
 from libs.terax.options import OptionBuilder
 from libs.terax.output import TeraxOutput
 from libs.terax.payload import PayloadResolver
-from libs.poly import EncodingError
 from terasploit.payload.badchars import BadCharFilter
 from terasploit.ui.printf import (
     error,
