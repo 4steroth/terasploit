@@ -42,9 +42,12 @@ MANIFEST
 # ==============================================================================
 # Framework Local Runtime & Dynamic Logs
 # ==============================================================================
+*.db
 *.log
 .history/
 .terasploit_history
+session/
+data/loot/
 
 # ==============================================================================
 # Payload Extension
@@ -61,5 +64,3 @@ MANIFEST
 .vscode/
 *.swp
 *.swo
-# Session persistence files - contain target IPs and engagement data
-session/
