@@ -1,6 +1,11 @@
 from collections.abc import Sequence
 
-from terasploit.module.payload import ARCH_X86, PLATFORM_LINUX, STAGE, Payload
+from libs.arch import ARCH_X86
+from libs.platform import PLATFORM_LINUX
+from terasploit.module.payload import (
+    STAGE,
+    Payload,
+)
 
 
 class TerasploitModule(Payload):
@@ -32,7 +37,5 @@ class TerasploitModule(Payload):
         return b""
 
     def generate_stage(self, ctx):
-        """
-        Return the Linux x86 shell stage bytes.
-        """
+        """Return the Linux x86 shell stage bytes."""
         return self.STAGE_BLOB

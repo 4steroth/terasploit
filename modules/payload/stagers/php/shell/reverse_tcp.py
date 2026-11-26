@@ -1,7 +1,9 @@
 from collections.abc import Sequence
 
 from extension.payload.php.reverse_tcp import PHPReverseTCP
-from terasploit.module.payload import ARCH_PHP, PLATFORM_PHP, STAGER, PayloadHandler
+from libs.arch import ARCH_PHP
+from libs.platform import PLATFORM_PHP
+from terasploit.module.payload import STAGER, PayloadHandler
 
 
 class TerasploitModule(PHPReverseTCP):

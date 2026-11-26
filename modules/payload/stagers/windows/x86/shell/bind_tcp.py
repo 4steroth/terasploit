@@ -1,9 +1,9 @@
 from collections.abc import Mapping, Sequence
 
 from extension.payload.windows.x86.bind_tcp_x86 import BindTcpX86
+from libs.arch import ARCH_X86
+from libs.platform import PLATFORM_WINDOWS
 from terasploit.module.payload import (
-    ARCH_X86,
-    PLATFORM_WINDOWS,
     STAGER,
     Payload,
     PayloadHandler,

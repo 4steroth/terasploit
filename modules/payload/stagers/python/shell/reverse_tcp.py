@@ -1,7 +1,12 @@
 from collections.abc import Sequence
 
 from extension.payload.python.reverse_tcp import PythonReverseTCP
-from terasploit.module.payload import ARCH_PYTHON, PLATFORM_PYTHON, STAGER, PayloadHandler
+from libs.arch import ARCH_PYTHON
+from libs.platform import PLATFORM_PYTHON
+from terasploit.module.payload import (
+    STAGER,
+    PayloadHandler,
+)
 
 
 class TerasploitModule(PythonReverseTCP):

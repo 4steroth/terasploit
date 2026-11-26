@@ -1,10 +1,12 @@
 import struct
 from collections.abc import Mapping, Sequence
 
-from terasploit.module.payload import ARCH_AARCH64, PLATFORM_LINUX, STAGE, Payload
-
-
-# Terasploit module
+from libs.arch import ARCH_AARCH64
+from libs.platform import PLATFORM_LINUX
+from terasploit.module.payload import (
+    STAGE,
+    Payload,
+)
 
 
 class TerasploitModule(Payload):

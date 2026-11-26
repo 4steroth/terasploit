@@ -1,7 +1,13 @@
 from collections.abc import Sequence
 
 from extension.payload.linux.x86.bind_tcp import BindTcpX86
-from terasploit.module.payload import ARCH_X86, PLATFORM_LINUX, STAGER, Payload, PayloadHandler
+from libs.arch import ARCH_X86
+from libs.platform import PLATFORM_LINUX
+from terasploit.module.payload import (
+    STAGER,
+    Payload,
+    PayloadHandler,
+)
 
 
 class TerasploitModule(BindTcpX86, Payload):

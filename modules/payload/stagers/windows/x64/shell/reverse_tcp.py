@@ -1,9 +1,9 @@
 from collections.abc import Mapping, Sequence
 
 from extension.payload.windows.x64.reverse_tcp_x64 import ReverseTcpX64
+from libs.arch import ARCH_X64
+from libs.platform import PLATFORM_WINDOWS
 from terasploit.module.payload import (
-    ARCH_X64,
-    PLATFORM_WINDOWS,
     STAGER,
     Payload,
     PayloadHandler,

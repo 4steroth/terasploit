@@ -1,6 +1,12 @@
 from collections.abc import Sequence
 
-from terasploit.module.payload import ARCH_ALL, PLATFORM_ALL, SINGLE, Payload, PayloadHandler
+from libs.arch import ARCH_ALL
+from libs.platform import PLATFORM_ALL
+from terasploit.module.payload import (
+    SINGLE,
+    Payload,
+    PayloadHandler,
+)
 
 
 class TerasploitModule(Payload):

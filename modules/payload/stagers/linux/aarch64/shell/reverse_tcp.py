@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 
 from extension.payload.linux.aarch64.reverse_tcp import ReverseTcpAarch64
+from libs.arch import ARCH_AARCH64
+from libs.platform import PLATFORM_LINUX
 from terasploit.module.payload import (
-    ARCH_AARCH64,
-    PLATFORM_LINUX,
     STAGER,
     Payload,
     PayloadHandler,
@@ -35,11 +35,10 @@ class TerasploitModule(ReverseTcpAarch64, Payload):
     OPTIONS: Sequence = ["LHOST", "LPORT", "BADCHARS"]
 
     def generate(self, ctx):
-        """
-        Generate the Linux AArch64 reverse-TCP stager shellcode.
-        """
+        """Generate the Linux AArch64 reverse-TCP stager shellcode."""
         host = ctx.get_option("LHOST")
         port = int(ctx.get_option("LPORT"))
+
         retry_count = int(ctx.get_option("StagerRetryCount") or 10)
         sleep_seconds = float(ctx.get_option("StagerRetryWait") or 5.0)
         exitfunc = str(ctx.get_option("EXITFUNC") or "process").lower().strip()

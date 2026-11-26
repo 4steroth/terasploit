@@ -1,6 +1,12 @@
 from collections.abc import Mapping, Sequence
 
-from terasploit.module.post import PLATFORM_LINUX, PLATFORM_UNIX, PLATFORM_WINDOWS, Post
+from libs.platform import (
+    PLATFORM_LINUX,
+    PLATFORM_UNIX,
+    PLATFORM_WINDOWS,
+)
+from libs.rank import Rank
+from terasploit.module.post import Post
 
 
 class TerasploitModule(Post):
@@ -11,7 +17,7 @@ class TerasploitModule(Post):
     AUTHOR: Sequence = ["4steroth"]
     LICENSE: str = "BSD-3-CLAUSE"
     VERSION: str = "1.0"
-    RANK: str = "normal"
+    RANK: str = Rank.NORMAL
     REFERENCES: Sequence = ["MSF - post/multi/gather/env"]
     PLATFORM: Sequence = [PLATFORM_LINUX, PLATFORM_UNIX, PLATFORM_WINDOWS]
     SESSION_TYPES: Sequence = ["shell"]

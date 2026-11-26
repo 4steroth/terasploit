@@ -2,7 +2,9 @@ import random
 from collections.abc import Sequence, Set as AbstractSet
 
 from extension.encoder.xor_dynamic import XorDynamic
-from terasploit.module.encoder import ARCH_X64, Encoder, EncoderRank, EncoderResult
+from libs.arch import ARCH_X64
+from libs.rank import EncoderRank
+from terasploit.module.encoder import Encoder, EncoderResult
 
 
 class TerasploitModule(XorDynamic, Encoder):

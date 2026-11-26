@@ -2,10 +2,10 @@ import socket
 import struct
 from collections.abc import Mapping, Sequence
 
+from libs.arch import ARCH_X64
+from libs.platform import PLATFORM_WINDOWS
 from libs.text import Text
 from terasploit.module.payload import (
-    ARCH_X64,
-    PLATFORM_WINDOWS,
     SINGLE,
     Payload,
     PayloadHandler,
@@ -30,7 +30,6 @@ class TerasploitModule(Payload):
     MAX_SIZE: int | None = 512
     ARCH: Sequence = [ARCH_X64]
     PLATFORM: Sequence = [PLATFORM_WINDOWS]
-
     # This bytearray is replaceable without changing anything in the methods below
     # Just make sure to add the correct offsets.
     PAYLOAD: Mapping = {
@@ -73,15 +72,12 @@ class TerasploitModule(Payload):
         """Write fixed-width encoded data into a bytearray."""
         if not isinstance(payload, bytearray):
             raise TypeError("payload must be a bytearray")
-
         if len(data) != expected_size:
             raise ValueError(f"Expected {expected_size} bytes, received {len(data)}")
-
         if offset < 0 or offset + expected_size > len(payload):
             raise ValueError("Field offset is outside the payload")
 
         payload[offset : offset + expected_size] = data
-
         return payload
 
     def pack_payload_contents(self, lhost, lport, exitfunc):

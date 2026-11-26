@@ -3,9 +3,11 @@ from collections import namedtuple
 from collections.abc import Mapping, Sequence
 
 from extension.encoder.xor_additive_feedback import XorAdditiveFeedback
+from libs.arch import ARCH_X86
 from libs.architecture.x86 import ARCHX86
 from libs.poly import EncodingError, LogicalBlock, LogicalRegisterX86, SymbolicBlock
-from terasploit.module.encoder import ARCH_X86, EncoderError, EncoderRank
+from libs.rank import EncoderRank
+from terasploit.module.encoder import EncoderError
 
 
 # Groups the three register references that every block-building helper needs,

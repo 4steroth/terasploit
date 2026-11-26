@@ -1,7 +1,12 @@
 import struct
 from collections.abc import Sequence
 
-from terasploit.module.payload import ARCH_PHP, PLATFORM_PHP, STAGE, Payload
+from libs.arch import ARCH_PHP
+from libs.platform import PLATFORM_PHP
+from terasploit.module.payload import (
+    STAGE,
+    Payload,
+)
 
 
 class TerasploitModule(Payload):

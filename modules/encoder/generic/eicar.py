@@ -1,14 +1,11 @@
 from collections.abc import Sequence
 
-from terasploit.module.encoder import Encoder, EncoderRank, EncoderResult
+from libs.rank import EncoderRank
+from terasploit.module.encoder import Encoder, EncoderResult
 
 
 class TerasploitModule(Encoder):
-    """
-    This is a simple encoder that replaces the given payload with the EICAR test string.
-    The EICAR test string is a standard string used to test antivirus software.
-    It is designed to trigger antivirus alerts without being harmful.
-    """
+    """The EICAR test string is a standard string used to test antivirus software."""
 
     NAME: str = "Eicar"
     DESCRIPTION: str = (
@@ -26,7 +23,6 @@ class TerasploitModule(Encoder):
 
     def eicar_test_string(self) -> str:
         """Generates the standard EICAR antivirus test string."""
-
         obfus_eicar = [
             "x5o!p%@ap[4\\pzx54(p^)7cc)7}$eicar",
             "standard",
@@ -43,7 +39,6 @@ class TerasploitModule(Encoder):
         ctx: object | None = None,
     ):
         """Encodes the given raw bytes by replacing them with the EICAR test string."""
-
         eicar_string = self.eicar_test_string()
         return EncoderResult(
             success=True,

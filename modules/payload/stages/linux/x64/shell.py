@@ -1,6 +1,11 @@
 from collections.abc import Sequence
 
-from terasploit.module.payload import ARCH_X64, PLATFORM_LINUX, STAGE, Payload
+from libs.arch import ARCH_X64
+from libs.platform import PLATFORM_LINUX
+from terasploit.module.payload import (
+    STAGE,
+    Payload,
+)
 
 
 class TerasploitModule(Payload):

@@ -6,6 +6,11 @@ from libs.proto.smb.client import SMBClient
 from libs.smb.constants import Constants
 from libs.smb.exception import ErrorCode
 from terasploit.module.auxiliary import Auxiliary
+from terasploit.module.intel import (
+    FindingRecord,
+    HostRecord,
+    ServiceRecord,
+)
 
 
 class TerasploitModule(Auxiliary):
@@ -43,6 +48,7 @@ class TerasploitModule(Auxiliary):
     OPTIONS: Sequence = ["RHOST", ("RPORT", {"default": 445})]
 
     def __init__(self):
+        """Initialize SMB detection options and named-pipe resources."""
         self.named_pipes = Path(__file__).resolve().parents[4] / "data" / "wordlists" / "named_pipes.txt"
         self.register_options(
             [
@@ -134,7 +140,7 @@ class TerasploitModule(Auxiliary):
                         conn.close(conn.default_tid, fid)
 
     def run(self, ctx):
-        """Scan for the presence of DoublePulsar from NSA."""
+        """Scan for the presence of Doublepulsar Implant from NSA."""
         ip = ctx.get_option("RHOST")
         ipc_share = f"\\\\{ip}\\IPC$"
 
@@ -164,17 +170,66 @@ class TerasploitModule(Auxiliary):
             if status == "STATUS_INSUFF_SERVER_RESOURCES":
                 arch = SMBClient.dcerpc_getarch(ip)
                 os_name = conn.get_server_os()
+
                 target_system = f"{os_name} - {arch} Architecture"
                 ctx.success(f"The host {ip} is likely vulnerable to MS17-010 - {target_system}")
+                self.record_host(
+                    ctx,
+                    HostRecord(
+                        address=ip,
+                        hostname=None,
+                        platform=os_name,
+                        arch=arch,
+                        services=[
+                            ServiceRecord(
+                                port=445,
+                                protocol="tcp",
+                                name="smb",
+                                product="Microsoft SMB",
+                                version="SMBv1 (Server Message Block version 1)",
+                            ),
+                        ],
+                        findings=[
+                            FindingRecord(
+                                name="MS17-010 SMB vulnerability detected",
+                                severity="high",
+                            ),
+                        ],
+                    ),
+                )
 
-                ctx.info("Scanning for the presence of DoublePulsar...")
+                ctx.info("Scanning for the presence of Doublepulsar...")
                 code, signature1, signature2 = self.do_smb_doublepulsar_probe(conn)
 
                 if code == 0x51:
                     ctx.info(
-                        f"The host {ip} is likely infected with DoublePulsar - "
+                        f"The host {ip} is likely infected with Doublepulsar implant - "
                         f"Arch {self.calculate_doublepulsar_arch(signature2)}, "
                         f"XOR Key {self.calculate_doublepulsar_xor_key(signature1)}"
+                    )
+                    self.record_host(
+                        ctx,
+                        HostRecord(
+                            address=ip,
+                            hostname=None,
+                            platform=os_name,
+                            arch=arch,
+                            services=[
+                                ServiceRecord(
+                                    port=445,
+                                    protocol="tcp",
+                                    name="smb",
+                                    product="Microsoft SMB",
+                                    version="SMBv1 (Server Message Block version 1)",
+                                ),
+                            ],
+                            findings=[
+                                FindingRecord(
+                                    name="Doublepulsar nation-state implant detected",
+                                    severity="critical",
+                                ),
+                            ],
+                        ),
                     )
                 else:
                     ctx.warning(f"The host {ip} is likely not infected with DoublePulsar")
@@ -195,6 +250,7 @@ class TerasploitModule(Auxiliary):
             with contextlib.suppress(Exception):
                 conn.disconnect_tree(conn.default_tid)
                 conn.logoff()
+
             with contextlib.suppress(Exception):
                 conn.get_socket().close()
 
