@@ -13,21 +13,17 @@ from terasploit.ui.printf import set_verbose, warning
 from terasploit.utils.path import ModuleIndex
 
 
-class Terasploit:
-    """Core console base."""
+class Framework:
+    """Initialize terasploit framework."""
 
-    history_file = os.path.join(
-        os.path.expanduser("~"),
-        ".terasploit",
-    )
-
+    history_file = os.path.join(os.path.expanduser("~"), ".terasploit")
     console_toggle = True
 
     def __init__(self, verbose=False, history_length=100, silent_banner=False):
-        """Initialize shared framework state and start the console."""
         # Shared state available to all command handlers via self.*.
         self.modules = ModuleIndex()
         self.module_storage = ModuleStorage()
+
         self.datastore = DATASTORE
         self.thread_handler = ThreadHandler(max_threads=10)
 
@@ -40,9 +36,6 @@ class Terasploit:
         # Startup sequence - order matters.
         set_verbose(verbose)
         self._register_framework_options(verbose)
-
-        # Apply MAX_THREADS from the framework datastore so operators who
-        # persist the option with setg see it honoured on the next launch.
         self._apply_startup_framework_options()
 
         display_banner(self.modules.list_modules(), silent=self.silent_banner)
@@ -68,7 +61,6 @@ class Terasploit:
         if os.path.exists(self.history_file):
             try:
                 readline.read_history_file(self.history_file)
-
             except OSError:
                 warning(f"Requirement file does not exist: {self.history_file}")
 
@@ -77,7 +69,6 @@ class Terasploit:
         length = self.datastore.get_value("HISTORY_LENGTH")
         try:
             cap = int(length) if length else self.history_length
-
         except ValueError, TypeError:
             cap = self.history_length
 

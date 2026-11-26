@@ -19,27 +19,24 @@ from terasploit.options.validators import (
 )
 
 
-# Constants
-
-_SCOPE_SEARCH_ORDER = (
-    "module",
-    "module_advanced",
-    "payload",
-    "payload_advanced",
-    "module_evasion",
-    "payload_evasion",
-    "encoder",
-    "framework",
-)
-
-_VALID_SCOPES = frozenset(_SCOPE_SEARCH_ORDER)
-
-
 class OptionStorage:
     """Key-value store for framework, module, payload, advanced, evasion, and encoder settings."""
 
+    SCOPE_SEARCH_ORDER = (
+        "module",
+        "module_advanced",
+        "payload",
+        "payload_advanced",
+        "module_evasion",
+        "payload_evasion",
+        "encoder",
+        "framework",
+    )
+
+    VALID_SCOPES = frozenset(SCOPE_SEARCH_ORDER)
+
     def __init__(self):
-        self._defs = {scope: {} for scope in _VALID_SCOPES}
+        self._defs = {scope: {} for scope in self.VALID_SCOPES}
         self._values: dict[str, Any] = {}
 
     def __getitem__(self, name: str) -> Any:
@@ -53,14 +50,14 @@ class OptionStorage:
 
     def _require_scope(self, scope):
         """Raise ValueError when *scope* is not recognised."""
-        if scope not in _VALID_SCOPES:
-            valid = ", ".join(sorted(_VALID_SCOPES))
+        if scope not in self.VALID_SCOPES:
+            valid = ", ".join(sorted(self.VALID_SCOPES))
             raise ValueError(f"Unknown scope {scope!r}. Valid scopes: {valid}")
 
     def _resolve_scopes(self, scope):
         """Return the search order for a definition lookup."""
         if scope is None:
-            return _SCOPE_SEARCH_ORDER
+            return self.SCOPE_SEARCH_ORDER
 
         self._require_scope(scope)
         return (scope,)
@@ -70,21 +67,14 @@ class OptionStorage:
         self._require_scope(scope)
 
         defs = self._defs[scope]
-
         for opt in options:
             defs[opt.key] = opt
             if opt.key not in self._values:
                 self._values[opt.key] = opt.default
 
-    def validate(
-        self,
-        name,
-        value,
-        scope=None,
-    ):
+    def validate(self, name, value, scope=None):
         """Validate *value* against the type constraint of the named option."""
         key = name.upper()
-
         for sc in self._resolve_scopes(scope):
             opt = self._defs[sc].get(key)
 
@@ -100,13 +90,12 @@ class OptionStorage:
     def set_value(self, name, value, scope=None):
         """Assign *value* to the option identified by *name*."""
         key = name.upper()
-
         if scope is not None:
             self._require_scope(scope)
             self._values[key] = value
             return True
 
-        known = key in self._values or any(key in self._defs[sc] for sc in _VALID_SCOPES)
+        known = key in self._values or any(key in self._defs[sc] for sc in self.VALID_SCOPES)
         if not known:
             return False
 
@@ -140,7 +129,7 @@ class OptionStorage:
         self._defs[scope].clear()
 
         for key in keys:
-            if not any(key in self._defs[other] for other in _VALID_SCOPES if other != scope):
+            if not any(key in self._defs[other] for other in self.VALID_SCOPES if other != scope):
                 self._values.pop(key, None)
 
 

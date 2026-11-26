@@ -36,6 +36,7 @@ class EncoderFactory:
         # .parent   = <project_root>/
 
         here = Path(__file__).resolve().parent  # terasploit/encoder/
+
         root = here.parent.parent  # project root
         return root / "modules" / "encoder"
 
@@ -45,12 +46,10 @@ class EncoderFactory:
         enc_dir = cls._encoder_dir()
         try:
             current_mtime = os.path.getmtime(str(enc_dir))
-
         except OSError:
             return
-
-        # Skip re-scan when mtime is unchanged and force is False.
         if not force and current_mtime == cls._encoder_dir_mtime:
+            # Skip re-scan when mtime is unchanged and force is False.
             return
 
         cls._encoder_dir_mtime = current_mtime
@@ -60,9 +59,8 @@ class EncoderFactory:
 
             relative = filepath.relative_to(enc_dir.parent).with_suffix("")
             dotted = "encoder." + ".".join(relative.parts[1:])
-
-            # Skip modules already registered from a previous scan.
             if dotted in cls._dotted_map:
+                # Skip modules already registered from a previous scan.
                 continue
 
             mod_obj = cls._load_file(dotted, str(filepath))
@@ -73,13 +71,11 @@ class EncoderFactory:
             klass = getattr(mod_obj, "TerasploitModule", None)
             if klass is None or not (isinstance(klass, type) and issubclass(klass, Encoder)):
                 continue
-
             try:
                 # Instantiate the encoder class - bad __init__ signatures
                 # raise TypeError, missing attributes raise AttributeError.
                 # pylint: disable=not-callable
                 instance = klass()
-
             except TypeError, AttributeError, ImportError, ValueError:
                 continue
 
@@ -94,11 +90,11 @@ class EncoderFactory:
                 return None
 
             mod = importlib.util.module_from_spec(spec)
+
             sys.modules[module_name] = mod
             spec.loader.exec_module(mod)
 
             return mod
-
         except ImportError, AttributeError, SyntaxError, OSError:
             return None
 
@@ -107,9 +103,8 @@ class EncoderFactory:
         """Add *instance* to the dotted-path map and the sorted registry."""
         with cls._lock:
             cls._dotted_map[dotted] = instance
-
-            # Guard against duplicate NAME registrations (e.g. after force re-scan).
             if any(e.NAME == instance.NAME for e in cls._registry):
+                # Guard against duplicate NAME registrations (e.g. after force re-scan).
                 return
 
             cls._registry.append(instance)
@@ -163,8 +158,6 @@ class EncoderFactory:
         cls._discover()
         return sorted(cls._dotted_map.keys())
 
-    # Selection
-
     @classmethod
     def suggest(cls, bad_bytes, arch=None):
         """Return compatible encoders sorted by rank (highest first)."""
@@ -175,16 +168,12 @@ class EncoderFactory:
                 # Encoder requires a specific architecture.
                 if not arch:
                     continue
-
                 if not any(a in enc.ARCH for a in arch):
                     continue
-
             if enc.can_avoid(bad_bytes):
                 candidates.append(enc)
 
         return candidates
-
-    # Encoding pipeline
 
     @classmethod
     def encode_payload(cls, raw_bad_bytes, encoder_name=None, arch=None, ctx=None):
@@ -200,9 +189,8 @@ class EncoderFactory:
                 key_used=None,
                 iterations=0,
             )
-
-        # Named encoder requested - try it exclusively.
         if encoder_name:
+            # Named encoder requested - try it exclusively.
             enc = cls.get(encoder_name)
             if enc is None:
                 available = ", ".join(e.NAME for e in cls._registry)

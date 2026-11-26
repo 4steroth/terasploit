@@ -5,13 +5,10 @@ def _normalise(value):
     """Return a lowercase list of string tokens from *value*."""
     if value is None:
         return []
-
     if isinstance(value, str):
         tokens = [value.strip().lower()]
-
     elif isinstance(value, (list, tuple)):
         tokens = [str(v).strip().lower() for v in value]
-
     else:
         tokens = [str(value).strip().lower()]
 
@@ -46,6 +43,7 @@ def payload_validate(module_obj, payload_obj):
 
     module_arch = _normalise(getattr(module_obj, "ARCH", None))
     module_platform = _normalise(getattr(module_obj, "PLATFORM", None))
+
     payload_arch = _normalise(getattr(payload_obj, "ARCH", None))
     payload_platform = _normalise(getattr(payload_obj, "PLATFORM", None))
 
@@ -53,7 +51,6 @@ def payload_validate(module_obj, payload_obj):
         overlap = set(module_arch) & set(payload_arch)
         if not overlap:
             reasons.append(f"Architecture mismatch: module supports {', '.join(module_arch)} but payload targets {', '.join(payload_arch)}.")
-
     if not _is_wildcard(module_platform) and not _is_wildcard(payload_platform) and payload_platform:
         overlap = set(module_platform) & set(payload_platform)
         if not overlap:

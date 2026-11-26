@@ -70,8 +70,11 @@ class GenericShell(BaseShell):
             return
 
         safe_remote = remote_path.replace("'", "'\\''")
-        cmd = f"base64 '{safe_remote}' 2>/dev/null; echo '---TERASPLOIT_SHELL_EOF---'"
-        self._send(cmd)
+        cmd = (
+            f"printf '%s%s\\n' '---TERASPLOIT_' 'SHELL_SOF---'; base64 '{safe_remote}' 2>/dev/null; printf '%s%s\\n' '---TERASPLOIT_' 'SHELL_EOF---'"
+        )
+        if not self._send(cmd):
+            self._stop_transfer()
 
     def _help_sections(self) -> list:
         base = super()._help_sections()

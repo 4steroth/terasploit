@@ -80,7 +80,6 @@ def _validate_integer(value):
     try:
         int(str(value).strip())
         return _OK
-
     except TypeError, ValueError:
         return _fail(f"Expected an integer (whole number), got: {value!r}")
 
@@ -90,7 +89,6 @@ def _validate_float(value):
     try:
         float(str(value).strip())
         return _OK
-
     except TypeError, ValueError:
         return _fail(f"Expected a numeric value (integer or decimal), got: {value!r}")
 
@@ -99,10 +97,8 @@ def _validate_port(value):
     """Accept integers in the TCP/UDP port range 1-65535."""
     try:
         port = int(str(value).strip())
-
     except TypeError, ValueError:
         return _fail(f"Port must be an integer, got: {value!r}")
-
     if not 1 <= port <= 65535:
         return _fail(f"Port must be between 1 and 65535 (inclusive), got: {port}")
     return _OK
@@ -111,17 +107,13 @@ def _validate_port(value):
 def _validate_address(value):
     """Accept IPv4 addresses, IPv6 addresses, or valid hostnames."""
     val = str(value).strip()
-
     try:
         ipaddress.ip_address(val)
         return _OK
-
     except ValueError:
         pass
-
     if val in ("0.0.0.0", "::", "::0"):
         return _OK
-
     if _HOSTNAME_RE.match(val):
         return _OK
 
@@ -131,17 +123,14 @@ def _validate_address(value):
 def _validate_url(value):
     """Accept URLs whose scheme is one of http, https, ftp, or ftps."""
     val = str(value).strip()
-
     try:
         parsed = urllib.parse.urlparse(val)
 
     except UrlParseError:
         return _fail(f"Could not parse URL: {value!r}")
-
     if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
         schemes = ", ".join(sorted(_ALLOWED_SCHEMES))
         return _fail(f"URL scheme {parsed.scheme!r} is not supported.  Allowed schemes: {schemes}")
-
     if not parsed.netloc:
         return _fail(f"URL must include a host (e.g. http://example.com/path), got: {value!r}")
 
@@ -151,16 +140,12 @@ def _validate_url(value):
 def _validate_path(value):
     """Accept any syntactically valid filesystem path."""
     val = str(value)
-
     if _FORBIDDEN_PATH_CHARS_RE.search(val):
         return _fail("Path must not contain null bytes.")
-
     if not val.strip():
         return _fail("Path must not be empty.")
-
     try:
         os.path.normpath(val)
-
     except (TypeError, ValueError) as exc:
         return _fail(f"Invalid path: {exc}")
 
@@ -182,7 +167,6 @@ def _validate_enum(value, choices):
 
     val_lower = str(value).strip().lower()
     choices_lower = [str(c).lower() for c in choices]
-
     if val_lower in choices_lower:
         return _OK
 
@@ -211,7 +195,6 @@ def validate(opt_type, value, choices=None):
     fn = _VALIDATORS.get(opt_type)
     if fn is None:
         return _OK
-
     if opt_type == OptionType.ENUM:
         return fn(value, choices or [])
 
@@ -219,9 +202,7 @@ def validate(opt_type, value, choices=None):
 
 
 def type_label(opt_type):
-    """
-    Return a short display label for the given type token.
-    """
+    """Return a short display label for the given type token."""
     labels = {
         OptionType.STRING: "string",
         OptionType.INTEGER: "integer",

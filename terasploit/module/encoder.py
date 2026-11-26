@@ -3,97 +3,23 @@ import dataclasses
 import os
 import random
 import struct
-from collections.abc import Callable, Mapping, Sequence
-from enum import IntEnum
-from typing import Any, Literal
-
-from extension.encoder.state import BadcharError, EncoderState
-from extension.module.base import Base
-from libs.arch import (
-    ARCH_AARCH64,
-    ARCH_ALL,
-    ARCH_ARMBE,
-    ARCH_ARMLE,
-    ARCH_BASH,
-    ARCH_CBEA,
-    ARCH_CBEA64,
-    ARCH_CMD,
-    ARCH_JAVA,
-    ARCH_LUA,
-    ARCH_MIPS,
-    ARCH_MIPS64,
-    ARCH_MIPS64LE,
-    ARCH_MIPSBE,
-    ARCH_MIPSLE,
-    ARCH_NODEJS,
-    ARCH_PERL,
-    ARCH_PHP,
-    ARCH_PPC,
-    ARCH_PPC64,
-    ARCH_PPC64LE,
-    ARCH_PPCE500V2,
-    ARCH_PYTHON,
-    ARCH_RUBY,
-    ARCH_SPARC,
-    ARCH_SPARC64,
-    ARCH_TTY,
-    ARCH_X64,
-    ARCH_X86,
-    ARCH_X86_64,
-    ARCH_ZARCH,
+from collections.abc import (
+    Callable,
+    Mapping,
+    Sequence,
 )
+from typing import (
+    Any,
+    Literal,
+)
+
+from extension.encoder.state import (
+    BadcharError,
+    EncoderState,
+)
+from extension.module.base import Base
+from libs.rank import EncoderRank
 from terasploit.utils.exception import EncoderError
-
-
-__all__ = [
-    "ARCH_AARCH64",
-    "ARCH_ALL",
-    "ARCH_ARMBE",
-    "ARCH_ARMLE",
-    "ARCH_BASH",
-    "ARCH_CBEA",
-    "ARCH_CBEA64",
-    "ARCH_CMD",
-    "ARCH_JAVA",
-    "ARCH_LUA",
-    "ARCH_MIPS",
-    "ARCH_MIPS64",
-    "ARCH_MIPS64LE",
-    "ARCH_MIPSBE",
-    "ARCH_MIPSLE",
-    "ARCH_NODEJS",
-    "ARCH_PERL",
-    "ARCH_PHP",
-    "ARCH_PPC",
-    "ARCH_PPC64",
-    "ARCH_PPC64LE",
-    "ARCH_PPCE500V2",
-    "ARCH_PYTHON",
-    "ARCH_RUBY",
-    "ARCH_SPARC",
-    "ARCH_SPARC64",
-    "ARCH_TTY",
-    "ARCH_X64",
-    "ARCH_X86",
-    "ARCH_X86_64",
-    "ARCH_ZARCH",
-    "EncoderState",
-]
-
-
-class EncoderRank(IntEnum):
-    """Numeric rank for encoder quality, used to sort the selection pipeline."""
-
-    MANUAL = 0
-    LOW = 100
-    NORMAL = 200
-    GOOD = 300
-    GREAT = 400
-    EXCELLENT = 500
-
-    def label(self) -> str:
-        """Return the capitalised rank name (e.g. 'Excellent')."""
-        return self.name.capitalize()
 
 
 @dataclasses.dataclass(slots=True)
@@ -120,38 +46,17 @@ class EncoderResult:
 class Encoder(Base):
     """Base class for all Terasploit payload encoders."""
 
-    #: Human-readable module name shown in the console.
     NAME: str
-
-    #: One-paragraph description of the exploit.
     DESCRIPTION: str
-
-    #: Author handle or contact information.
     AUTHOR: str | Sequence
-
-    #: SPDX license identifier, e.g. "BSD-3-CLAUSE".
     LICENSE: str = "BSD-3-CLAUSE"
-
-    #: Semantic version string, e.g. "1.0".
     VERSION: str
-
-    #: Module reliability ranking.
     RANK: int = EncoderRank.NORMAL
-
-    #: External references as [type, url] pairs.
     REFERENCES: Sequence
-
-    #: Target architectures. Use the ARCH_* constants for consistency.
-    #: Use ["all"] to accept any architecture.
     ARCH: Sequence
-
     MAX_ITERATIONS: int = 256
-
-    #: Optional bytes to prepend before the payload; may be static or callable.
     PREPEND_BUF: Any
-
-    #: Decoder stub configuration: key offset, key size, and struct pack format.
-    DECODER: Mapping[str, str | int] = {
+    DECODER: Mapping = {
         "KeyOffset": 10,
         "KeySize": 4,
         "KeyPack": "<I",
@@ -196,8 +101,8 @@ class Encoder(Base):
 
         badchars_set = set(badchars) if isinstance(badchars, bytes) else badchars
         key_bytes = [0] * key_size
-        found = False
 
+        found = False
         while not found:
             for index in range(key_size):
                 current_bad = set(bad_keys[index].keys()) if isinstance(bad_keys[index], dict) else set(bad_keys[index])
@@ -207,13 +112,11 @@ class Encoder(Base):
                 key_bytes[index] = random.choice(good_keys)
 
             found = not any(b in badchars_set for b in key_bytes)
-
             if found and hasattr(self, "find_key_verify"):
                 found = self.find_key_verify(buf, key_bytes, badchars)
 
         if len(key_bytes) != key_size:
             return None
-
         if hasattr(self, "key_bytes_to_integer"):
             return self.key_bytes_to_integer(key_bytes)
 
@@ -226,12 +129,14 @@ class Encoder(Base):
         encoder_name = self._get_encoder_name()
         try:
             state = self._build_initial_state(raw_bytes, bad_bytes)
+
             self._apply_prepend_data(state, encoder_name)
             self._apply_init_state(state)
+
             self._resolve_key_if_needed(state, encoder_name)
             self._run_encode_pipeline(state)
-            return self._build_success_result(state, encoder_name)
 
+            return self._build_success_result(state, encoder_name)
         except EncoderError:
             return self._handle_encode_error(encoder_name)
 
@@ -243,6 +148,7 @@ class Encoder(Base):
         """Construct and return the initial EncoderState."""
         state = EncoderState()
         state.buf = raw_bytes
+
         state.badchars = bad_bytes
         return state
 
@@ -257,7 +163,6 @@ class Encoder(Base):
                 prepend_data = prepend_data()
         except Exception as exc:
             raise RuntimeError(f"Error generating prepended data for {encoder_name}: {exc}") from exc
-
         if not isinstance(prepend_data, bytes):
             raise TypeError(f"PREPEND_BUF must be bytes or callable returning bytes, got {type(prepend_data)}")
 
@@ -279,24 +184,20 @@ class Encoder(Base):
             raise RuntimeError("No key discovery method available")
 
         resolved_key = key_finder(state.buf, state.badchars, state)
-
         if hasattr(state, "init_key"):
             state.init_key(resolved_key)
         else:
             state.key = resolved_key
-
         if state.key is None:
             raise RuntimeError(f"Failed to resolve key for {encoder_name}")
 
     def _run_encode_pipeline(self, state):
         """Execute encode hooks and core encoding logic."""
         state.encoded = b""
-
         if hasattr(self, "encode_begin"):
             self.encode_begin(state)
 
         self.do_encode(state)
-
         if hasattr(self, "encode_end"):
             self.encode_end(state)
 
@@ -339,10 +240,11 @@ class Encoder(Base):
 
         key_size = getattr(state, "decoder_key_size", 4)
         key_pack = getattr(state, "decoder_key_pack", "<I")
+
         real_key = self._resolve_decoder_key(state)
         packed_key = struct.pack(key_pack, int(real_key))[:key_size]
-        stub[key_offset : key_offset + key_size] = packed_key
 
+        stub[key_offset : key_offset + key_size] = packed_key
         return stub
 
     def _finalize_stub(self, state, stub):
@@ -360,8 +262,8 @@ class Encoder(Base):
     def _encode_payload_blocks(self, state):
         """Encode the payload buffer in block-sized chunks."""
         encoded = bytearray()
-        block_size = self.decoder_block_size()
 
+        block_size = self.decoder_block_size()
         if not block_size:
             encoded.extend(self.encode_block(state, state.buf))
             return encoded
@@ -370,6 +272,7 @@ class Encoder(Base):
             block = state.buf[offset : offset + block_size]
             if len(block) < block_size:
                 block = block.ljust(block_size, b"\x00")
+
             encoded.extend(self.encode_block(state, block))
 
         return encoded
@@ -387,7 +290,11 @@ class Encoder(Base):
     def obtain_key(self, buf, badchars, state):
         """Legacy alias for find_key; supports the context-encoding path."""
         if self.DATASTORE["EnableContextEncoding"]:
-            return self.find_context_key(buf, badchars, state)
+            return self.find_context_key(
+                buf,
+                badchars,
+                state,
+            )
         return self.find_key(buf, badchars, state)
 
     def find_context_key(self, buf, badchars, state):
@@ -400,8 +307,10 @@ class Encoder(Base):
             raise LookupError(f"No context key could be located in {context_file}")
 
         address, key = result
+
         state.context_address = address
         state.context_encoding = True
+
         return key
 
     def _get_context_file(self):
@@ -446,7 +355,6 @@ class Encoder(Base):
                 continue
 
             return address, self.key_bytes_to_integer(key_bytes)
-
         return None
 
     def _is_valid_context_address(self, address, badchars):
@@ -459,7 +367,10 @@ class Encoder(Base):
 
     def key_bytes_to_integer(self, key_bytes):
         """Pack key bytes into an integer using the decoder's key format."""
-        return struct.unpack(self.decoder_key_pack(), self.key_bytes_to_buffer(key_bytes))[0]
+        return struct.unpack(
+            self.decoder_key_pack(),
+            self.key_bytes_to_buffer(key_bytes),
+        )[0]
 
     def integer_to_key_bytes(self, integer):
         """Unpack an integer key into a list of bytes using decoder format."""

@@ -5,8 +5,6 @@ class XorDynamic(Base):
     """x64 single-byte XOR encoder"""
 
     def __init__(self):
-        super().__init__()
-
         self.register_advanced_options(
             [
                 self.opt(

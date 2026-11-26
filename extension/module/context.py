@@ -17,10 +17,12 @@ class ContextDeps:
     payload_obj: Any | None = None
     module_obj: Any | None = None
     available_space: int | None = None
+    intelligence: Any | None = None
+    loot: Any | None = None
 
 
 @dataclasses.dataclass
-class _EncodingResult:
+class EncodingResult:
     """Intermediate result passed between the bad-char helper methods."""
 
     raw: bytes
@@ -36,15 +38,15 @@ class ExploitContext:
     session = None  # Set by the driver after a connection is opened.
 
     def __init__(self, deps):
-        """
-        Initialise the context.
-        """
+        """Initialize the exploit context."""
         self.job_id = deps.job_id
         self.bus = deps.bus
         self.datastore = deps.datastore
         self._payload = deps.payload_obj
         self._module = deps.module_obj
         self.available_space: int | None = deps.available_space
+        self._intel = deps.intelligence
+        self.loot = deps.loot
 
     def info(self, message):
         """Emit an informational log message."""
@@ -102,7 +104,7 @@ class ExploitContext:
             enc_name = self._resolve_option_cascade("ENCODER") or None
             if enc_name:
                 self.info(f"[ContextEnc] EnableContextEncoding is set - encoding with '{enc_name}'.")
-                state = _EncodingResult(
+                state = EncodingResult(
                     raw=raw,
                     bad_bytes=frozenset(),
                     enc_name=enc_name,
@@ -130,7 +132,7 @@ class ExploitContext:
             return raw
 
         self._report_badchar_hits(scan, raw, bad_bytes)
-        state = _EncodingResult(
+        state = EncodingResult(
             raw=raw,
             bad_bytes=bad_bytes,
             enc_name=self._resolve_option_cascade("ENCODER") or None,
@@ -191,9 +193,8 @@ class ExploitContext:
         strict_raw = self._resolve_option_cascade("BADCHARS_STRICT")
         if str(strict_raw).lower().strip() in ("true", "yes", "1", "on"):
             raise ValueError(
-                "[BadChar] BADCHARS_STRICT is enabled and encoding failed - delivery aborted.  Adjust the BADCHARS set or choose a different payload."
+                "[BadChar] BADCHARS_STRICT is enabled and encoding failed - delivery aborted. Adjust the BADCHARS set or choose a different payload."
             )
-
         self.warning("[BadChar] Continuing with unencoded payload (set BADCHARS_STRICT=true to block).")
 
     def _run_size_check(self, raw):
@@ -220,6 +221,8 @@ class ExploitContextDeps:
     datastore: Any
     bus: Any
     available_space: int | None = None
+    intelligence: Any | None = None
+    loot: Any | None = None
 
 
 @dataclasses.dataclass
@@ -230,6 +233,8 @@ class PostContextDeps:
     bus: Any
     datastore: Any
     session: Any  # ShellSession instance resolved by cmd_run
+    intelligence: Any | None = None
+    loot: Any | None = None
 
 
 class PostContext:
@@ -240,6 +245,8 @@ class PostContext:
         self.bus = deps.bus
         self.datastore = deps.datastore
         self.session = deps.session
+        self._intel = deps.intelligence
+        self.loot = deps.loot
 
     # Logging - same surface as ExploitContext so module authors
     # need only one mental model for ctx logging calls.
@@ -275,11 +282,13 @@ class PostContext:
 
 @dataclasses.dataclass
 class AuxiliaryContextDeps:
-    """Dependencies injected into PostContext."""
+    """Dependencies injected into AuxiliaryContext."""
 
     job_id: Any
     bus: Any
     datastore: Any
+    intelligence: Any | None = None
+    loot: Any | None = None
 
 
 class AuxiliaryContext:
@@ -289,6 +298,8 @@ class AuxiliaryContext:
         self.job_id = deps.job_id
         self.bus = deps.bus
         self.datastore = deps.datastore
+        self._intel = deps.intelligence
+        self.loot = deps.loot
 
     def info(self, message: str) -> None:
         """Emit an informational log message."""

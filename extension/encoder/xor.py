@@ -9,17 +9,16 @@ class Xor(Encoder):
 
     def encode_block(self, state, block):
         """Encodes a block of data using repeating-key XOR based on decoder key size."""
-        # Match decoder_key_size directly like Ruby's case statement
         match state.decoder_key_size:
-            case 8:  # Rex::Encoding::Xor::Qword.keysize
+            case 8:
                 pack_format = "Q"
-            case 4:  # Rex::Encoding::Xor::Dword.keysize
+            case 4:
                 pack_format = "I"
-            case 2:  # Rex::Encoding::Xor::Word.keysize
+            case 2:
                 pack_format = "H"
-            case 1:  # Rex::Encoding::Xor::Byte.keysize
+            case 1:
                 pack_format = "B"
-            case _:  # Default to Dword
+            case _:
                 pack_format = "I"
 
         # Pack state.key using state.decoder_key_pack or the matched fallback format

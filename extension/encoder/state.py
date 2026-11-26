@@ -2,7 +2,6 @@ class EncoderState:
     """Track the state of a single encoding operation."""
 
     def __init__(self, key=None):
-        """Initialize the encoder state."""
         self.key = None
         self.orig_key = None
         self.encoded = b""

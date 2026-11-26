@@ -1,6 +1,8 @@
 import dataclasses
 import datetime
+import re
 import sys
+from typing import IO
 
 
 # ANSI escape codes
@@ -14,6 +16,8 @@ CYAN = "\033[0;36m"
 GRAY = "\033[0;90m"
 WHITE = "\033[0;37m"
 
+ANSI_PATTERN = re.compile(r"\033\[[0-?]*[ -/]*[@-~]")
+
 
 @dataclasses.dataclass
 class State:
@@ -24,6 +28,9 @@ class State:
 
     # When True, every log line is prefixed with the current wall-clock time.
     timestamp: bool = False
+
+    # File to write the output
+    file: IO = sys.stdout
 
 
 def set_verbose(enabled=True):
@@ -41,51 +48,54 @@ def set_timestamp(enabled=True):
     State.timestamp = enabled
 
 
-def _emit_write(message):
-    """Write one formatted log line to stdout and flush immediately."""
-    sys.stdout.write(message)
-    sys.stdout.flush()
-
-
-def _emit(symbol, color, message):
-    """Format and write one log line with the given *symbol* and *color*."""
-    if State.timestamp is True:
-        now = datetime.datetime.now().strftime("%H:%M:%S")
-        timestamp = f"[{CYAN}{now}{RESET}]"
-        _emit_write(f"{timestamp} [{color}{symbol}{RESET}] {message}\n")
-
-    if State.timestamp is False:
-        _emit_write(f"{color}{symbol}{RESET} {message}\n")
-
-
-def info(message):
-    """Emit a [*] informational message (blue)."""
-    _emit("[*]" if not State.timestamp else "INFO", BOLD + BLUE, message)
-
-
-def success(message):
-    """Emit a [+] success message (green)."""
-    _emit("[+]" if not State.timestamp else "INFO", BOLD + GREEN, message)
-
-
-def warning(message):
-    """Emit a [!] warning message (yellow)."""
-    _emit("[!]" if not State.timestamp else "WARNING", BOLD + YELLOW, message)
-
-
-def error(message):
-    """Emit a [-] error message (red)."""
-    _emit("[-]" if not State.timestamp else "ERROR", BOLD + RED, message)
-
-
-def debug(message):
-    """Emit a [~] debug message (gray)."""
-    if State.verbosity:
-        _emit("[~]" if not State.timestamp else "DEBUG", CYAN, message)
-
-
-def print_line(*args, sep=" ", end="\n", file=sys.stdout, flush=False):
-    """Write a plain line to stdout with no symbol prefix."""
-    file.write((sep if sep is not None else " ").join(str(a) for a in args) + (end if end is not None else "\n"))
+def write(text, flush=False):
+    """Write output to the configured stream and optionally to the loot file."""
+    State.file.write(text)
     if flush:
-        file.flush()
+        State.file.flush()
+
+
+def print_line(*args, sep=" ", end="\n", flush=False):
+    """Write a plain line to stdout with no symbol prefix."""
+    text = (sep if sep is not None else " ").join(map(str, args))
+    write(text + (end if end is not None else "\n"), flush=flush)
+
+
+def log(symbol, color, *message, sep=" ", end="\n", flush=False):
+    """Format and write one log line with the given symbol and color."""
+    prefix = f"{color}{symbol}{RESET} "
+
+    if State.timestamp:
+        now = datetime.datetime.now().strftime("%H:%M:%S")
+        prefix = f"[{CYAN}{now}{RESET}] {prefix}"
+
+    write(
+        prefix + (sep if sep is not None else " ").join(map(str, message)) + (end if end is not None else "\n"),
+        flush=flush,
+    )
+
+
+def info(*message, sep=" ", end="\n", flush=False):
+    """Emit an informational message."""
+    log("[*]", BOLD + BLUE, *message, sep=sep, end=end, flush=flush)
+
+
+def success(*message, sep=" ", end="\n", flush=False):
+    """Emit a success message."""
+    log("[+]", BOLD + GREEN, *message, sep=sep, end=end, flush=flush)
+
+
+def warning(*message, sep=" ", end="\n", flush=False):
+    """Emit a warning message."""
+    log("[!]", BOLD + YELLOW, *message, sep=sep, end=end, flush=flush)
+
+
+def error(*message, sep=" ", end="\n", flush=False):
+    """Emit an error message."""
+    log("[-]", BOLD + RED, *message, sep=sep, end=end, flush=flush)
+
+
+def debug(*message, sep=" ", end="\n", flush=False):
+    """Emit a debug message when verbosity is enabled."""
+    if State.verbosity:
+        log("[~]", CYAN, *message, sep=sep, end=end, flush=flush)

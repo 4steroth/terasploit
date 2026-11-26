@@ -18,12 +18,12 @@ MAP = {
 }
 
 
-def select_shell(session, platform=None, session_registry_fn=None):
+def select_shell(session, platform=None, session_registry_fn=None, loot_manager=None):
     """Return the appropriate shell instance for *platform*"""
     platform_key = (platform or getattr(session, "platform", None) or "").lower().strip()
 
     cls = MAP.get(platform_key, GenericShell)
-    return cls(session=session, session_registry_fn=session_registry_fn)
+    return cls(session=session, session_registry_fn=session_registry_fn, loot_manager=loot_manager)
 
 
 __all__ = ["BaseShell", "GenericShell", "UnixShell", "WindowsShell", "select_shell"]

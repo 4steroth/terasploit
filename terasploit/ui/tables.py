@@ -54,8 +54,9 @@ class TableSchema:
 
     def __post_init__(self):
         self.headers = tuple(self.headers)
-        self.min_widths = list(self.min_widths)
-        self.wrap_widths = list(self.wrap_widths)
+        n_cols = len(self.headers)
+        self.min_widths = (list(self.min_widths) + [0] * n_cols)[:n_cols]
+        self.wrap_widths = (list(self.wrap_widths) + [0] * n_cols)[:n_cols]
 
 
 class TableRenderer:
@@ -156,6 +157,24 @@ class TableRenderer:
         self._render_header(widths)
         for row in rows:
             self._render_row(row, widths)
+
+
+def render_table(
+    headers,
+    rows,
+    *,
+    min_widths=None,
+    wrap_widths=None,
+    padding=Constants.table_padding,
+):
+    """Render rows with automatic terminal-aware column wrapping."""
+    schema = TableSchema(
+        headers=tuple(headers),
+        min_widths=min_widths or [],
+        wrap_widths=wrap_widths or [],
+        padding=padding,
+    )
+    TableRenderer(schema).render(rows)
 
 
 def _dottedto_path(dotted):

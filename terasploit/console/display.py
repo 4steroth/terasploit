@@ -1,34 +1,37 @@
-from terasploit.console.base import BaseConsole
+from collections.abc import Mapping
+
 from terasploit.console.helpers import (
     category_of,
     filter_compatible,
     to_path,
 )
 from terasploit.ui import tables as tbl
-from terasploit.ui.printf import info, print_line, warning
-
-
-CATEGORY_LABELS = {
-    "exploit": "Exploit",
-    "auxiliary": "Auxiliary",
-    "payload": "Payload",
-    "encoder": "Encoder",
-    "post": "Post",
-    "evasion": "Evasion",
-}
+from terasploit.ui.printf import (
+    info,
+    print_line,
+    warning,
+)
 
 
 class ConsoleDisplay:
     """Render module, option, advanced, and evasion information."""
 
-    def __init__(self, console: BaseConsole) -> None:
-        """Bind display operations to the shared console."""
+    CATEGORY_LABELS: Mapping = {
+        "exploit": "Exploit",
+        "auxiliary": "Auxiliary",
+        "payload": "Payload",
+        "encoder": "Encoder",
+        "post": "Post",
+        "evasion": "Evasion",
+    }
+
+    def __init__(self, console) -> None:
         self.console = console
 
     def cmd_show(self, args):
         """Dispatch show sub-commands to their respective display methods."""
         if not args:
-            warning("Usage: show <target>  -  options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post")
+            warning("Usage: show <target> - options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post")
             return
 
         sub = args[0].lower()
@@ -51,7 +54,6 @@ class ConsoleDisplay:
         if handler is None:
             warning(f"Unknown show target '{sub}'.  Try: options, advanced, targets, modes, all, exploits, payloads, auxiliary, encoders, post.")
             return
-
         if sub in ("modules", "exploits", "auxiliary", "payloads", "encoders", "post", "all"):
             print_line(f'\nShow: "{sub}"\n')
 
@@ -59,63 +61,86 @@ class ConsoleDisplay:
         print_line("\n")
 
     def show_options(self):
-        """Display basic module options, basic payload options, and targets."""
+        """Display module, payload, encoder options, and targets."""
         entry = self.console.module_storage.module()
         if entry is None:
-            self.show_framework_options()
-            return
+            return self.show_framework_options()
 
         category = category_of(entry.name)
-        label = CATEGORY_LABELS.get(category, category.capitalize())
-
-        if category in ("exploit", "auxiliary", "payload", "post", "evasion"):
-            mod_defs = self.console.datastore.definitions("module")
-            mod_vals = self.console.datastore.all_values("module")
-
-            has_options = entry.module.OPTIONS if category != "post" else bool(mod_defs)
-            if has_options and mod_defs:
-                tbl.options_table(
-                    f"{label} options ({to_path(entry.name)})",
-                    mod_defs,
-                    mod_vals,
-                )
+        label = self.CATEGORY_LABELS.get(category, category.capitalize())
+        self._show_module_options(entry, category, label)
 
         pay_entry = self.console.module_storage.payload()
-        if pay_entry is not None:
-            if category == "exploit" and entry.module.OPTIONS:
-                print_line()
-
-            pay_defs = self.console.datastore.definitions("payload")
-            pay_vals = self.console.datastore.all_values("payload")
-
-            if pay_defs:
-                tbl.options_table(
-                    f"Payload options ({to_path(pay_entry.name)})",
-                    pay_defs,
-                    pay_vals,
-                )
-
-        elif not self.console.datastore.definitions("module"):
-            print_line()
-            print_line(f"{label} options ({to_path(entry.name)}):")
-            print_line()
-            print_line("   (no options available for this module)")
-            print_line()
+        self._show_payload_options(entry, pay_entry)
 
         enc_entry = self.console.module_storage.encoder()
-        if enc_entry is not None:
-            if pay_entry is not None:
-                print_line()
+        self._show_encoder_options(pay_entry, enc_entry)
 
-            enc_defs = self.console.datastore.definitions("encoder")
-            enc_vals = self.console.datastore.all_values("encoder")
-            if enc_defs:
-                tbl.options_table(f"Encoder options ({to_path(enc_entry.name)})", enc_defs, enc_vals)
+        self._show_targets(entry)
+        return None
 
-        targets = getattr(entry.module, "TARGET", None)
-        if targets:
+    def _show_module_options(self, entry, category, label):
+        """Display the active module's options."""
+        if category not in ("exploit", "auxiliary", "payload", "post", "evasion"):
+            return
+
+        definitions = self.console.datastore.definitions("module")
+        has_options = bool(definitions) if category == "post" else entry.module.OPTIONS
+        if has_options and definitions:
+            tbl.options_table(
+                f"{label} options ({to_path(entry.name)})",
+                definitions,
+                self.console.datastore.all_values("module"),
+            )
+
+    def _show_payload_options(self, entry, pay_entry):
+        """Display payload options or the module's empty-options message."""
+        definitions = self.console.datastore.definitions("payload")
+        if pay_entry is None:
+            if not self.console.datastore.definitions("module"):
+                label = self.CATEGORY_LABELS.get(
+                    category_of(entry.name),
+                    category_of(entry.name).capitalize(),
+                )
+                print_line(f"\n{label} options ({to_path(entry.name)}):\n")
+                print_line("   (no options available for this module)\n")
+            return
+        if category_of(entry.name) == "exploit" and entry.module.OPTIONS:
             print_line()
-            tbl.targets_table(targets)
+        if definitions:
+            tbl.options_table(
+                f"Payload options ({to_path(pay_entry.name)})",
+                definitions,
+                self.console.datastore.all_values("payload"),
+            )
+
+    def _show_encoder_options(self, pay_entry, enc_entry):
+        """Display encoder options."""
+        if enc_entry is None:
+            return
+        if pay_entry is not None:
+            print_line()
+
+        definitions = self.console.datastore.definitions("encoder")
+        if definitions:
+            tbl.options_table(
+                f"Encoder options ({to_path(enc_entry.name)})",
+                definitions,
+                self.console.datastore.all_values("encoder"),
+            )
+
+    def _show_targets(self, entry):
+        """Display the currently selected module target."""
+        targets = getattr(entry.module, "TARGET", None)
+        if not targets:
+            return
+
+        current_target = self.console.datastore["TARGET"]
+        for target in targets:
+            if current_target == target[1]:
+                print_line()
+                tbl.targets_table(((target[0], target[1]),), title="Target")
+                return
 
     def show_advanced(self):
         """Display advanced options for the active module and its payload."""
@@ -130,7 +155,6 @@ class ConsoleDisplay:
             self.show_payload_advanced()
             self.show_encoder_summary()
             return
-
         if category == "payload":
             self.show_payload_advanced()
             self.show_encoder_summary()
@@ -142,7 +166,6 @@ class ConsoleDisplay:
         """Render a datastore scope's options table, or a fallback message if it's empty."""
         defs = self.console.datastore.definitions(scope)
         vals = self.console.datastore.all_values(scope)
-
         if defs:
             tbl.options_table(title, defs, vals)
         elif no_options_message:
@@ -152,8 +175,8 @@ class ConsoleDisplay:
         """Render the advanced options table for the active module."""
         name = entry.name
         category = category_of(name)
-        label = CATEGORY_LABELS.get(category, category.capitalize())
 
+        label = self.CATEGORY_LABELS.get(category, category.capitalize())
         self._render_scoped_options(
             "module_advanced",
             f"{label} advanced options ({to_path(name)})",
@@ -177,6 +200,7 @@ class ConsoleDisplay:
         if enc_entry is None:
             return
 
+        # Getting encoder metadata
         enc_obj = enc_entry.module
         rank = enc_obj.RANK
         rank_lbl = getattr(rank, "label", lambda: str(rank))()
@@ -207,8 +231,8 @@ class ConsoleDisplay:
         """Render the evasion options table for the active module."""
         name = entry.name
         category = category_of(name)
-        label = CATEGORY_LABELS.get(category, category.capitalize())
 
+        label = self.CATEGORY_LABELS.get(category, category.capitalize())
         self._render_scoped_options(
             "module_evasion",
             f"{label} evasion options ({to_path(name)})",
@@ -230,7 +254,6 @@ class ConsoleDisplay:
         """Display the framework core options stored in the framework scope."""
         fw_defs = self.console.datastore.definitions("framework")
         fw_vals = self.console.datastore.all_values("framework")
-
         if fw_defs:
             tbl.options_table("Framework core options", fw_defs, fw_vals)
             return
@@ -255,11 +278,19 @@ class ConsoleDisplay:
 
     def show_auxiliary_modes(self):
         """Display the auxiliary modes."""
-        self._show_module_settings("AUXILIARY_MODE", "Auxiliary modes", "auxiliary")
+        self._show_module_settings(
+            "AUXILIARY_MODE",
+            "Auxiliary modes",
+            "auxiliary",
+        )
 
     def show_targets(self):
         """Display the targets declared by the exploit module."""
-        self._show_module_settings("TARGET", "Targets", "exploit")
+        self._show_module_settings(
+            "TARGET",
+            "Targets",
+            "exploit",
+        )
 
     def show_category(self, category=None):
         """Display a modules table filtered by category."""
@@ -269,7 +300,6 @@ class ConsoleDisplay:
         entry = self.console.module_storage.module()
         if entry is not None and category in ("payload", "encoder"):
             filtered = filter_compatible(filtered, entry.module, category)
-
             if not filtered:
                 info(f"No compatible {category}s found for the active module. Showing all instead.")
                 filtered = [m for m in all_modules if category_of(m) == category]

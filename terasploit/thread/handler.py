@@ -6,8 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from terasploit.thread.output_bus import OutputBus
-from terasploit.utils.exception import WorkerThreadError
+from terasploit.thread.outputbus import OutputBus
 
 
 STATUS_QUEUED = "queued"
@@ -146,7 +145,7 @@ class ThreadHandler:
                         record.status = STATUS_COMPLETED
                         record.result = result
 
-            except WorkerThreadError as exc:
+            except Exception as exc:
                 ctx.error(str(exc))
                 with self._lock:
                     if kill_event.is_set():

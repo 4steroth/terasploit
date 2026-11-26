@@ -17,7 +17,6 @@ class XorAdditiveFeedback(Encoder):
     def find_key(self, buf, badchars, *args, **kwargs):
         """Finds a key that is compatible with the badchars list."""
         state = args[0] if args else kwargs.get("state")
-
         if state is None:
             state = EncoderState()
 

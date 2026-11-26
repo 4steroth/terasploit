@@ -19,7 +19,6 @@ def normalise_list(value):
     """Coerce an ARCH or PLATFORM class attribute to a normalised frozenset."""
     if value is None:
         return frozenset()
-
     if isinstance(value, str):
         return frozenset({value.lower().strip()})
 
@@ -33,15 +32,14 @@ def is_compatible(module_obj, candidate_cls, category):
     """Return True when *candidate_cls* is compatible with the active *module_obj*."""
     mod_arch = normalise_list(getattr(module_obj, "ARCH", ["all"]))
     mod_platform = normalise_list(getattr(module_obj, "PLATFORM", ["all"]))
+
     cand_arch = normalise_list(getattr(candidate_cls, "ARCH", ["all"]))
     cand_plat = normalise_list(getattr(candidate_cls, "PLATFORM", ["all"]))
 
     # "all" on either side is a wildcard - always matches.
     arch_ok = "all" in mod_arch or "all" in cand_arch or bool(mod_arch & cand_arch)
-
     if not arch_ok:
         return False
-
     if category == "encoder":
         # Encoders are not platform-gated.
         return True
@@ -77,14 +75,9 @@ def filter_compatible(module_paths, module_obj, category):
             if cls is None:
                 compatible.append(dotted)
                 continue
-
             if is_compatible(module_obj, cls, category):
                 compatible.append(dotted)
-
         except ModuleInspectionError:
             compatible.append(dotted)
 
     return compatible
-
-
-__all__ = ["category_of", "filter_compatible", "is_compatible", "normalise_list", "to_path"]

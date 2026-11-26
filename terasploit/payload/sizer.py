@@ -27,7 +27,6 @@ class SizeCheckResult:
         parts = [f"size={self.generated:,} bytes"]
         if self.payload_space is not None:
             parts.append(f"space={self.payload_space:,}")
-
         if self.max_size is not None:
             parts.append(f"max={self.max_size:,}")
 
@@ -40,12 +39,11 @@ class PayloadSizeChecker:
     def check(self, raw_bytes, payload_obj, module_obj=None):
         """Run all size checks and return a :class:SizeCheckResult."""
         generated = len(raw_bytes)
-        max_size = self.read_int(payload_obj, "MAX_SIZE")
-        payload_space = self.read_int(module_obj, "PAYLOAD_SPACE")
 
         warnings = []
         errors = []
 
+        max_size = self.read_int(payload_obj, "MAX_SIZE")
         if max_size is not None and generated > max_size:
             errors.append(
                 f"Payload size {generated:,} bytes exceeds MAX_SIZE "
@@ -53,6 +51,7 @@ class PayloadSizeChecker:
                 "The payload is internally inconsistent."
             )
 
+        payload_space = self.read_int(module_obj, "PAYLOAD_SPACE")
         if payload_space is not None:
             if generated > payload_space:
                 overage = generated - payload_space

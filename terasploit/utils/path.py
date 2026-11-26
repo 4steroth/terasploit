@@ -23,8 +23,8 @@ class ModuleIndex:
     def _scan(self):
         """Walk base_dir recursively and build a name -> path dict."""
         result = {}
-        base = Path(self.base_dir)
 
+        base = Path(self.base_dir)
         if not base.exists():
             return result
 
@@ -56,9 +56,9 @@ class ModuleIndex:
     def refresh(self, force=False):
         """Rebuild the index if any subdirectory under base_dir has been modified."""
         mtime = self._max_mtime()
-
         if force or mtime != self._mtime:
             self._modules = self._scan()
+
             self._mtime = mtime
             # Evict cache entries for modules that no longer exist.
             with self._load_cache_lock:
@@ -77,13 +77,12 @@ class ModuleIndex:
 
         q = query.lower()
         words = q.split()
-        found = []
 
+        found = []
         for name in self._modules:
             lower = name.lower()
 
             matched = all(word in lower for word in words) if fuzzy else q in lower
-
             if matched:
                 found.append(name)
 

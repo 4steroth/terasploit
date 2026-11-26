@@ -36,7 +36,6 @@ def _build_parser():
         formatter_class=CompactHelpFormatter,
         color=False,
     )
-
     parser.add_argument(
         "-d",
         "--debug",
@@ -73,7 +72,6 @@ def _build_parser():
         metavar="CMDs",
         help=('Execute semicolon-separated commands, then drop to REPL (e.g. "use x; set Y z")'),
     )
-
     return parser
 
 
@@ -89,12 +87,10 @@ def _run_resource(console, filepath):
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-
             try:
                 cmd, args = console.parse_line(line)
                 if cmd:
                     console.dispatch(cmd, args)
-
             except RuntimeError as exc:
                 error(f"[rc:{lineno}] {exc}")
 
@@ -105,12 +101,10 @@ def _run_inline(console, command_string):
         line = raw.strip()
         if not line:
             continue
-
         try:
             cmd, args = console.parse_line(line)
             if cmd:
                 console.dispatch(cmd, args)
-
         except RuntimeError as exc:
             error(f"[inline] {exc}")
 
@@ -119,24 +113,28 @@ def main():
     """The main entry point of terasploit framework"""
     parser = _build_parser()
     opts = parser.parse_args()
-
     if opts.version:
         print_line(f"Terasploit Framework {VERSION}")
         sys.exit(0)
-
     if opts.debug:
         set_verbose(True)
 
     console = CLi(verbose=opts.debug, silent_banner=opts.quiet)
-
     if opts.module:
-        console.dispatch("use", [opts.module])
-
+        console.dispatch(
+            "use",
+            [opts.module],
+        )
     if opts.execute:
-        _run_inline(console, opts.execute)
-
+        _run_inline(
+            console,
+            opts.execute,
+        )
     if opts.resource:
-        _run_resource(console, opts.resource)
+        _run_resource(
+            console,
+            opts.resource,
+        )
 
     # Drop into the interactive REPL.
     console.start()

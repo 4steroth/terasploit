@@ -1,18 +1,18 @@
+from pathlib import Path
+
 from terasploit.metadata import VERSION
 from terasploit.ui.printf import print_line
 
 
 CATEGORIES = ("exploit", "auxiliary", "payload", "encoder", "post")
-BANNER = f"""
-   __                                 __         __ __
-  |  |_.-----.----.---.-.-----.-----.|  |.-----.|__|  |_
-  |   _|  -__|   _|  _  |__ --|  _  ||  ||  _  ||  |   _|
-  |____|_____|__| |___._|_____|   __||__||_____||__|____|
-                              |__|
 
-  Exploitation Framework for Cross-Platform Red Team Operations
-  Version: {VERSION}
-"""
+
+def count_artifacts(directory="session", ext="*.json") -> int:
+    """Count stored artifacts from a specified directory."""
+    session_dir = Path(__file__).resolve().parents[2] / "data" / directory
+    if not session_dir.is_dir():
+        return 0
+    return sum(1 for f in session_dir.rglob(ext) if f.is_file())
 
 
 def display_banner(module_list, silent=False):
@@ -26,9 +26,27 @@ def display_banner(module_list, silent=False):
         if category is not None:
             counts[category] += 1
 
-    print_line(BANNER)
+    modules = (
+        f"{counts['exploit']} exploit · {counts['auxiliary']} auxiliary · {counts['payload']} payload · ",
+        f"{counts['encoder']} encoder · {counts['post']} post",
+    )
+
     print_line(
-        " ",
-        f"{counts['exploit']} exploit - {counts['auxiliary']} auxiliary - {counts['payload']} payload -",
-        f"{counts['encoder']} encoder - {counts['post']} post\n\n",
+        "",
+        "   __                                 __         __ __",
+        "  |  |_.-----.----.---.-.-----.-----.|  |.-----.|__|  |_",
+        "  |   _|  -__|   _|  _  |__ --|  _  ||  ||  _  ||  |   _|",
+        "  |____|_____|__| |___._|_____|   __||__||_____||__|____|",
+        "                              |__|",
+        "\n",
+        "  Exploitation Framework for Red Team Operations",
+        "  ──────────────────────────────────────────────",
+        "",
+        f"  Version   {VERSION}",
+        f"  Modules   {''.join(modules)}",
+        "",
+        f"  Session opened: {count_artifacts(directory='session', ext='*.json')}",
+        f"  Looted session artifacts: {count_artifacts(directory='loot', ext='*')}",
+        "\n",
+        sep="\n",
     )

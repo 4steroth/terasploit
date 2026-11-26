@@ -1,7 +1,7 @@
-from terasploit.console.terasploit import Terasploit
+from terasploit.console.framework import Framework
 
 
-class BaseConsole(Terasploit):
+class BaseConsole(Framework):
     """Provide shared framework state to the console and its components."""
 
     def flush_job_output(self) -> None:

@@ -76,27 +76,30 @@ class ModuleStorage:
 
     def clear_module(self):
         """Unload the active exploit/auxiliary module."""
-        if self._module is not None:
-            self._module.cleanup()
-            self._module = None
-            return True
-        return False
+        if self._module is None:
+            return False
+
+        self._module.cleanup()
+        self._module = None
+        return True
 
     def clear_payload(self):
         """Unload the active payload."""
-        if self._payload is not None:
-            self._payload.cleanup()
-            self._payload = None
-            return True
-        return False
+        if self._payload is None:
+            return False
+
+        self._payload.cleanup()
+        self._payload = None
+        return True
 
     def clear_encoder(self):
         """Unload the active encoder."""
-        if self._encoder is not None:
-            self._encoder.cleanup()
-            self._encoder = None
-            return True
-        return False
+        if self._encoder is None:
+            return False
+
+        self._encoder.cleanup()
+        self._encoder = None
+        return True
 
     def clear_all(self):
         """Unload all active components in reverse dependency order."""
@@ -108,10 +111,8 @@ class ModuleStorage:
         parts = []
         if self._module:
             parts.append(f"module={self._module.name!r}")
-
         if self._payload:
             parts.append(f"payload={self._payload.name!r}")
-
         if self._encoder:
             parts.append(f"encoder={self._encoder.name!r}")
 

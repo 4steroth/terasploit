@@ -1,8 +1,9 @@
 import subprocess
+import sys
 
-from terasploit.console.base import BaseConsole
-from terasploit.console.help import help_sections
+from terasploit.console.help import SECTIONS
 from terasploit.encoder.factory import EncoderFactory
+from terasploit.ui import tables as tbl
 from terasploit.ui.banner import display_banner
 from terasploit.ui.printf import (
     error,
@@ -11,17 +12,14 @@ from terasploit.ui.printf import (
     success,
     warning,
 )
+from terasploit.ui.record import recorder
 from terasploit.utils.exception import ShellExecError
-
-
-COMMAND_COLUMN_WIDTH = 30
 
 
 class CoreCommands:
     """Handle core console commands."""
 
-    def __init__(self, console: BaseConsole) -> None:
-        """Bind this command group to the shared console."""
+    def __init__(self, console) -> None:
         self.console = console
 
     def cmd_banner(self, _: list[str]) -> None:
@@ -30,18 +28,17 @@ class CoreCommands:
 
     def cmd_help(self, _: list[str]) -> None:
         """Display a grouped command reference table."""
-        width = COMMAND_COLUMN_WIDTH
-
+        schema = tbl.TableSchema(
+            headers=("Command", "Description"),
+            min_widths=[36, 20],
+            wrap_widths=[36, 60],
+            padding=3,
+        )
         print_line()
 
-        for section_name, entries in help_sections:
+        for section_name, entries in SECTIONS:
             print_line(f"{section_name} commands\n")
-            print_line(f"   {'Command':<{width}} Description")
-            print_line(f"   {'-------':<{width}} -----------")
-
-            for command, description in entries:
-                print_line(f"   {command:<{width}}  {description}")
-
+            tbl.TableRenderer(schema).render(entries)
             print_line("\n")
 
     def cmd_clear(self, _: list[str]) -> None:
@@ -58,14 +55,79 @@ class CoreCommands:
         info(f"Executing: {command_string}")
 
         try:
-            result = subprocess.run(command_string, shell=True, check=False)
-
-        except ShellExecError as exc:
+            process = subprocess.Popen(
+                command_string,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                errors="replace",
+            )
+        except OSError as exc:
             error(f"Shell execution failed: {exc}")
             return
+        try:
+            if process.stdout is None:
+                raise ShellExecError("Could not display output, process stdout is None.")
+            with process.stdout:
+                for line in process.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
 
-        if result.returncode != 0:
-            warning(f"Command exited with status {result.returncode}.")
+            returncode = process.wait()
+        except ShellExecError as exc:
+            process.kill()
+            process.wait()
+            error(f"Shell execution failed: {exc}")
+            return
+        except KeyboardInterrupt:
+            process.terminate()
+            process.wait()
+            warning("Command interrupted.")
+            return
+
+        if returncode != 0:
+            warning(f"Command exited with code {returncode}")
+
+    def cmd_record(self, args: list[str]) -> None:
+        """Start, stop, or inspect console transcript recording."""
+        if not args:
+            if recorder.active:
+                info(f"Recording to: {recorder.path}")
+            else:
+                info("No active recording.")
+            return
+
+        action = args[0].lower()
+        if action == "start":
+            if len(args) > 2:
+                warning("Usage: record start [file]")
+                return
+            try:
+                path = recorder.start(args[1] if len(args) == 2 else None)
+            except (OSError, RuntimeError, ValueError) as exc:
+                error(f"Unable to start recording: {exc}")
+                return
+
+            prompt = getattr(self.console, "_user_prompt", lambda: "")()
+            command = "record start" + (f" {args[1]}" if len(args) == 2 else "")
+            recorder.write_input(f"{prompt}{command}")
+            success(f"Recording started: {path}")
+        elif action == "stop":
+            if not recorder.active:
+                warning("No active recording.")
+                return
+
+            path = recorder.path
+            success(f"Recording stopped: {path}")
+            recorder.stop()
+        elif action == "status":
+            if recorder.active:
+                info(f"Recording to: {recorder.path}")
+            else:
+                info("No active recording.")
+        else:
+            warning("Usage: record <start [file] | stop | status>")
 
     def cmd_reload(self, _: list[str]) -> None:
         """Force-rescan the module index and reset the encoder registry."""

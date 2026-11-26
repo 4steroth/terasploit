@@ -1,4 +1,8 @@
-from terasploit.module.payload import ADAPTER, ALL_PAYLOAD_TYPES, SINGLE, STAGE, STAGER
+from terasploit.module.payload import ADAPTER, SINGLE, STAGE, STAGER
+
+
+#: Frozenset of all recognised payload type strings.
+ALL_PAYLOAD_TYPES = frozenset({SINGLE, STAGER, STAGE, ADAPTER})
 
 
 def get_payload_type(payload_obj):

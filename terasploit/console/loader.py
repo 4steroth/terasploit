@@ -1,6 +1,5 @@
 import dataclasses
 
-from terasploit.console.base import BaseConsole
 from terasploit.console.helpers import to_path
 from terasploit.encoder.factory import EncoderFactory
 from terasploit.module.encoder import Encoder
@@ -39,7 +38,6 @@ def _resolve_keys(keys):
             OPTION_REGISTRY.setdefault(key.key, key)
             resolved.append(key)
             continue
-
         if isinstance(key, str):
             name, overrides = key, None
         elif isinstance(key, tuple) and len(key) == 2 and isinstance(key[0], str) and isinstance(key[1], dict):
@@ -52,11 +50,9 @@ def _resolve_keys(keys):
         if opt is None:
             warning(f"Option key {name!r} not found in OPTION_REGISTRY - skipping.")
             continue
-
         if overrides is None:
             resolved.append(opt)
             continue
-
         try:
             resolved.append(dataclasses.replace(opt, **overrides))
         except TypeError as exc:
@@ -68,8 +64,7 @@ def _resolve_keys(keys):
 class ConsoleLoader:
     """Load modules, payloads, encoders, and console options."""
 
-    def __init__(self, console: BaseConsole) -> None:
-        """Bind the loader to the shared console."""
+    def __init__(self, console) -> None:
         self.console = console
 
     def resolve_module_name(self, args):
@@ -78,12 +73,10 @@ class ConsoleLoader:
             warning("Usage: use <module_name>")
             return None
 
-        raw = args[0].replace("/", ".")
-
         # Encoder paths are handled by a dedicated loader - signal the caller.
+        raw = args[0].replace("/", ".")
         if raw.startswith("encoder.") or args[0].startswith("encoder/"):
             return "__encoder__"
-
         if self.console.modules.get_path(raw) is not None:
             return raw
 
@@ -91,7 +84,6 @@ class ConsoleLoader:
         if not matches:
             error(f"Module not found: {args[0]!r}")
             return None
-
         if len(matches) > 1:
             info(f"Ambiguous - {len(matches)} modules match {args[0]!r}:")
             tbl.modules_table(matches)
@@ -123,11 +115,9 @@ class ConsoleLoader:
         resolved = self.resolve_module_name(args)
         if resolved is None:
             return
-
         if resolved == "__encoder__":
             self._load_encoder(args[0])
             return
-
         if resolved.startswith("payload"):
             self._load_payload(args[0], silent=False)
             return
@@ -164,9 +154,8 @@ class ConsoleLoader:
         except ModuleInitializationError as exc:
             error(f"Module initialisation error: {exc}")
             return None
-
-        # Clear existing module first before setting the new one to avoid options duplicates
         if self.console.module_storage.module() is not None:
+            # Clear existing module first before setting the new one to avoid options duplicates
             self.cmd_back(args)
 
         self.console.module_storage.set_module(resolved, obj)
@@ -178,8 +167,8 @@ class ConsoleLoader:
         self.console.datastore.clear_scope("module")
         if obj.OPTIONS:
             self.console.datastore.register("module", _resolve_keys(obj.OPTIONS))
-        # Post modules expose SESSION in "show options" and in missing_required.
         if resolved.startswith("post"):
+            # Post modules expose SESSION in "show options" and in missing_required.
             self.console.datastore.register("module", POST_MODULE_OPTIONS)
 
         self.console.datastore.clear_scope("module_advanced")
@@ -196,7 +185,6 @@ class ConsoleLoader:
         """Applies default target/mode selection and auto-loads a payload."""
         if resolved.startswith("exploit"):
             self.console.datastore.set_value("TARGET", obj.TARGET[0][1], "module")
-
         if resolved.startswith("auxiliary"):
             self.console.datastore.set_value("AUXILIARY_MODE", obj.AUXILIARY_MODE[0][1], "module")
 
@@ -208,7 +196,6 @@ class ConsoleLoader:
     def cmd_back(self, _):
         """Unload the active module and return to the root prompt."""
         module = self.console.module_storage.module()
-
         if module and hasattr(module, "name"):
             self.console.module_storage.clear_module()
             self.console.module_storage.clear_payload()
@@ -238,13 +225,13 @@ class ConsoleLoader:
 
         name = args[0].upper()
         value = " ".join(args[1:])
-
         delegated = {
             "PAYLOAD": self._load_payload,
             "ENCODER": self._load_encoder,
             "TARGET": self._set_target,
             "MODE": self._set_auxiliary_mode,
         }
+
         delegate = delegated.get(name)
         if delegate is not None:
             delegate(value)
@@ -256,13 +243,14 @@ class ConsoleLoader:
         """Write *name* / *value* to the appropriate scope and report the result."""
         if not self.console.module_storage.has_module():
             result = self.console.datastore.validate(name, value, scope="framework")
-            if result.ok:
-                self.console.datastore.set_value(name, value, scope="framework")
-                self.apply_framework_option(name, value)
-                print_line(f"{name} => {value}")
+            if not result.ok:
+                warning(result.reason)
                 return
 
-            warning(result.reason)
+            self.console.datastore.set_value(name, value, scope="framework")
+            self.apply_framework_option(name, value)
+
+            print_line(f"{name} => {value}")
             return
 
         result = self.console.datastore.validate(name, value)
@@ -280,7 +268,6 @@ class ConsoleLoader:
             return
 
         name = args[0].upper()
-
         if self.console.datastore.set_value(name, None):
             info(f"Unset: {name}")
             return
@@ -290,14 +277,12 @@ class ConsoleLoader:
     def _handle_verbose(self, truthy: bool) -> None:
         """Configures framework-wide global execution logging verbosity."""
         set_verbose(truthy)
-        level = "enabled" if truthy else "disabled"
-        info(f"Verbose output {level}.")
+        info(f"Verbose output {'enabled' if truthy else 'disabled'}.")
 
     def _handle_timestamp(self, truthy: bool) -> None:
         """Configures stdout log decoration with date/time prefixes."""
         set_timestamp(truthy)
-        level = "enabled" if truthy else "disabled"
-        info(f"Timestamp output {level}.")
+        info(f"Timestamp output {'enabled' if truthy else 'disabled'}.")
 
     def _handle_max_threads(self, value) -> None:
         """Dynamically expands or cuts operational execution worker pool queues."""
@@ -308,7 +293,6 @@ class ConsoleLoader:
 
             self.console.thread_handler.set_max_threads(new_max)
             info(f"Thread pool resized to {new_max} worker(s).")
-
         except (ValueError, TypeError) as exc:
             warning(f"MAX_THREADS must be a positive integer: {exc}")
 
@@ -321,7 +305,6 @@ class ConsoleLoader:
 
             state = "disabled" if seconds == 0 else f"set to {seconds}s"
             info(f"Session idle timeout {state}.")
-
         except ValueError, TypeError:
             warning(f"SESSION_TIMEOUT must be a number, got: {value!r}")
 
@@ -336,14 +319,11 @@ class ConsoleLoader:
     def _load_payload(self, raw, silent=False):
         """Load a payload module and register its options into the datastore."""
         name = raw.replace("/", ".")
-
         if self.console.modules.get_path(name) is None:
             matches = self.console.modules.search(name)
-
             if not matches:
                 error(f"Payload not found: {raw!r}")
                 return
-
             if len(matches) > 1:
                 warning(f"Ambiguous payload - {len(matches)} match(es):")
                 for match in matches[:8]:
@@ -374,13 +354,13 @@ class ConsoleLoader:
                 return
 
         self._payload_options(name, obj)
-
         if not silent:
             print_line(f"PAYLOAD => {to_path(name)}")
 
     def _payload_options(self, name, obj):
         """Register a payload's options into the datastore scopes."""
         self.console.module_storage.set_payload(name, obj)
+
         self.console.datastore.clear_scope("payload")
         self.console.datastore.clear_scope("payload_advanced")
         self.console.datastore.clear_scope("payload_evasion")
@@ -392,21 +372,31 @@ class ConsoleLoader:
         # payload's own ADVANCED_OPTIONS layer on top.
         self.console.datastore.register("payload_advanced", PAYLOAD_ADVANCED_OPTIONS)
         if obj.ADVANCED_OPTIONS:
-            self.console.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
-
+            self.console.datastore.register(
+                "payload_advanced",
+                _resolve_keys(obj.ADVANCED_OPTIONS),
+            )
         if getattr(obj.HANDLER, "HANDLER_TYPE", None) == "reverse":
-            self.console.datastore.register("payload_advanced", REVERSE_TCP_ADVANCED_OPTIONS)
-
+            self.console.datastore.register(
+                "payload_advanced",
+                REVERSE_TCP_ADVANCED_OPTIONS,
+            )
         if obj.PAYLOAD_TYPE == "stager":
-            self.console.datastore.register("payload_advanced", STAGER_ADVANCED_OPTIONS)
-
-        # Evasion options are opt-in per payload via EVASION_OPTIONS, not dumped globally.
+            self.console.datastore.register(
+                "payload_advanced",
+                STAGER_ADVANCED_OPTIONS,
+            )
         if obj.STAGE_ENCODING is True:
-            self.console.datastore.register("payload_advanced", PAYLOAD_EVASION_OPTIONS)
-
+            # Evasion options are opt-in per payload via EVASION_OPTIONS, not dumped globally.
+            self.console.datastore.register(
+                "payload_advanced",
+                PAYLOAD_EVASION_OPTIONS,
+            )
         if obj.EVASION_OPTIONS:
-            self.console.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
-
+            self.console.datastore.register(
+                "payload_evasion",
+                _resolve_keys(obj.EVASION_OPTIONS),
+            )
         if obj.STAGE_ENCODING is False and obj.EVASION_OPTIONS:
             warning("Evasion options found in module metadata, but the module does not support stage encoding.")
 
@@ -415,7 +405,6 @@ class ConsoleLoader:
         name = raw.replace("/", ".").strip(".")
         if not name.startswith("encoder."):
             name = "encoder." + name
-
         if self.console.modules.get_path(name) is None:
             matches = self.console.modules.search(name)
             if not matches:
@@ -440,7 +429,6 @@ class ConsoleLoader:
         if not (isinstance(cls_obj, type) and issubclass(cls_obj, Encoder)):
             error(f"Encoder {name!r}: TerasploitModule must inherit Encoder.")
             return
-
         try:
             obj = cls_obj()
         except ModuleInitializationError as exc:
@@ -461,22 +449,28 @@ class ConsoleLoader:
             rank_label = getattr(obj.RANK, "label", lambda: str(obj.RANK))()
             arch_str = ", ".join(obj.ARCH) if obj.ARCH else "generic"
             print_line(f"ENCODER => {to_path(name)}")
+
             success(f"Encoder loaded: {to_path(name)} [rank={rank_label}, arch={arch_str}]")
 
     def _encoder_options(self, obj):
         """Load all available options for encoder."""
-
         # Clear all current encoder options.
         self.console.datastore.clear_scope("encoder")
-
         if obj.OPTIONS:
-            self.console.datastore.register("encoder", _resolve_keys(obj.OPTIONS))
-
+            self.console.datastore.register(
+                "encoder",
+                _resolve_keys(obj.OPTIONS),
+            )
         if obj.ADVANCED_OPTIONS:
-            self.console.datastore.register("payload_advanced", _resolve_keys(obj.ADVANCED_OPTIONS))
-
+            self.console.datastore.register(
+                "payload_advanced",
+                _resolve_keys(obj.ADVANCED_OPTIONS),
+            )
         if obj.EVASION_OPTIONS:
-            self.console.datastore.register("payload_evasion", _resolve_keys(obj.EVASION_OPTIONS))
+            self.console.datastore.register(
+                "payload_evasion",
+                _resolve_keys(obj.EVASION_OPTIONS),
+            )
 
     def _select_indexed_option(self, value, setup) -> None:
         """Select an item from a module's indexed option list by numeric ID."""
@@ -491,10 +485,8 @@ class ConsoleLoader:
         if not items:
             warning(f"This module does not declare any {no_items_label}.")
             return
-
         try:
             tid = int(value)
-
         except ValueError:
             error(f"{numeric_label} must be a numeric ID, got: {value!r}")
             return
@@ -512,26 +504,12 @@ class ConsoleLoader:
         """Select the active target by numeric ID."""
         self._select_indexed_option(
             value,
-            (
-                "TARGET",
-                "TARGET",
-                "targets",
-                "TARGET",
-                True,
-                False,
-            ),
+            ("TARGET", "TARGET", "targets", "TARGET", True, False),
         )
 
     def _set_auxiliary_mode(self, value):
         """Select the active auxiliary mode by numeric ID."""
         self._select_indexed_option(
             value,
-            (
-                "AUXILIARY_MODE",
-                "AUXILIARY MODE",
-                "auxiliary modes",
-                "Auxiliary Mode",
-                False,
-                True,
-            ),
+            ("AUXILIARY_MODE", "AUXILIARY MODE", "auxiliary modes", "Auxiliary Mode", False, True),
         )

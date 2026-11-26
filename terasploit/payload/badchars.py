@@ -13,7 +13,6 @@ class BadCharScanResult:
     """Result of scanning a byte sequence for bad characters."""
 
     def __init__(self, hits, payload_length, clean=None, bad_bytes_found=None):
-        """Initialise a BadCharScanResult."""
         self.hits = hits
         self.payload_length = payload_length
         self.bad_bytes_found = bad_bytes_found if bad_bytes_found is not None else frozenset(v for _, v in hits)
@@ -74,8 +73,8 @@ class BadCharFilter:
             return "No bad bytes found."
 
         parts = [f"Offset 0x{offset:04x} ({offset}): \\x{byte:02x}" for offset, byte in result.hits]
-        lines = ["  ".join(parts[i : i + 8]) for i in range(0, len(parts), 8)]
 
+        lines = ["  ".join(parts[i : i + 8]) for i in range(0, len(parts), 8)]
         return "\n".join(lines)
 
     @staticmethod
@@ -108,6 +107,6 @@ class BadCharFilter:
                     tokens.append(f"[{byte:02x}]")
                 else:
                     tokens.append(f" {byte:02x} ")
-            rows.append(f"0x{row_start:04x}  {''.join(tokens)}")
 
+            rows.append(f"0x{row_start:04x}  {''.join(tokens)}")
         return "\n".join(rows)
