@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from terasploit.console.help import SECTIONS
+from terasploit.console.commands.section import SECTIONS
 from terasploit.encoder.factory import EncoderFactory
 from terasploit.ui import tables as tbl
 from terasploit.ui.banner import display_banner

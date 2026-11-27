@@ -134,7 +134,6 @@ class ThreadHandler:
 
             kill_event = record.kill_event
             ctx = ModuleContext(task_id, self.output_bus, kill_event)
-
             try:
                 result = func(ctx, *args, **kwargs)
 
@@ -144,17 +143,19 @@ class ThreadHandler:
                     else:
                         record.status = STATUS_COMPLETED
                         record.result = result
-
-            except Exception as exc:
-                ctx.error(str(exc))
+            # We catch general exception here because we would want to
+            # prevent module failure from killing a worker thread.
+            except Exception as exc:  # pylint: disable=W0718
+                error_traceback = traceback.format_exc()
                 with self._lock:
                     if kill_event.is_set():
                         record.status = STATUS_KILLED
                     else:
                         record.status = STATUS_FAILED
                         record.error = str(exc)
-                        record.traceback = traceback.format_exc()
+                        record.traceback = error_traceback
 
+                ctx.error(f"[{type(exc).__name__}]: {exc}")
             finally:
                 self._task_queue.task_done()
                 record.done_event.set()

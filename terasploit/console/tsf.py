@@ -19,12 +19,8 @@ class CompactHelpFormatter(argparse.RawDescriptionHelpFormatter):
     def __init__(self, *args, **kwargs):
         """Configure terminal-aware help formatting."""
         kwargs.setdefault("max_help_position", 50)
-
-        size = shutil.get_terminal_size(fallback=(80, 24))
-        width = size.columns
-
         # Setting width base on terminal size
-        kwargs.setdefault("width", width)
+        kwargs.setdefault("width", shutil.get_terminal_size(fallback=(80, 24)).columns)
 
         super().__init__(*args, **kwargs)
 

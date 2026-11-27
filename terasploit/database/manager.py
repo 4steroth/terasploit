@@ -134,7 +134,20 @@ class IntelligenceDatabase:
                 ),
             ).fetchone()
 
-    def add_service(self, workspace, host, protocol, port, name=None, product=None, version=None):
+    # By the design of the api, we will disable too-many-arguments.
+    # This does not make the method complex.
+
+    def add_service(  # pylint: disable=R0913
+        self,
+        workspace,
+        host,
+        protocol,
+        port,
+        *,
+        name=None,
+        product=None,
+        version=None,
+    ):
         """Insert or update a service record."""
         host_row = self.get_host(workspace, host)
         if host_row is None:

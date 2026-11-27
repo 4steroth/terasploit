@@ -37,7 +37,10 @@ class LootManager:
             raise ValueError("A valid artifact filename is required.")
         return name
 
-    def store_bytes(
+    # By the design of the api, we will disable too-many-arguments since
+    # this method needs these arguments for storing metadata.
+
+    def store_bytes(  # pylint: disable=R0913
         self,
         content,
         filename,
@@ -68,7 +71,11 @@ class LootManager:
             workspace=workspace,
         )
 
-    def store_file(
+    # By the design of the api, we will disable too-many-arguments since
+    # this method requires all these argument to store and catalog the
+    # artifact's metadata
+
+    def store_file(  # pylint: disable=R0913
         self,
         source_path,
         *,
@@ -101,7 +108,10 @@ class LootManager:
                 workspace=workspace,
             )
 
-    def _store_stream(
+    # By the design of the api, we will disable both too-many-arguments and too-many-locals
+    # This does not make the method complex, it simply needs all these arguments for metadata
+
+    def _store_stream(  # pylint: disable=R0913,R0914
         self,
         stream,
         filename,
@@ -168,7 +178,14 @@ class LootManager:
             destination.unlink(missing_ok=True)
             raise
 
-    def get_all(self, *, host=None, session_id=None, workspace=None, limit=200):
+    def get_all(
+        self,
+        *,
+        host=None,
+        session_id=None,
+        workspace=None,
+        limit=200,
+    ):
         """List cataloged artifacts in the selected workspace."""
         return self.database.get_all(
             workspace or self.workspace,
@@ -223,11 +240,10 @@ class LootManager:
         if record is None:
             return False
 
-        path = self.path_for(record)
-
         removed = self.database.delete(workspace, identifier)
         if removed is None:
             return False
 
+        path = self.path_for(record)
         path.unlink(missing_ok=True)
         return True

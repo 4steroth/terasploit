@@ -58,13 +58,12 @@ class ExecutionCommands:
         if missing:
             error(f"Required option(s) not set: {RED}{', '.join(missing)}{RESET}.")
             return
-
-        # Payload only relevant for exploit modules
-        payload_obj = self._resolve_payload_obj() if is_exploit else None
-
         if not hasattr(entry.module, "run"):
             warning(f"Module '{to_path(entry.name)}' has no 'run' method.")
             return
+
+        # Payload only relevant for exploit modules
+        payload_obj = self._resolve_payload_obj() if is_exploit else None
 
         # Execute the module
         self._run_module(entry, payload_obj)
@@ -108,19 +107,16 @@ class ExecutionCommands:
             try:
                 if self.console.thread_handler.wait_until_done(task_id, poll=0.15):
                     break
-
                 if self.console.thread_handler.output_bus.pending() > 0:
                     self.console.flush_job_output()
             except KeyboardInterrupt:
                 interrupt += 1
                 print_line()
-
                 if not cancelled:
                     info("Interrupt received. Python cannot safely force-terminate threads. Waiting for task to finish...")
                     self.console.thread_handler.kill_task(task_id)
                     cancelled = True
                     continue
-
             if interrupt > 1:
                 info("Received more than 1 interrupt, returning to console. The task may still be running...")
                 break

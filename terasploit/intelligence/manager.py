@@ -48,16 +48,29 @@ class IntelManager:
         """Return hosts and their service/finding counts."""
         return self.database.list_hosts(workspace or self.workspace)
 
-    def add_service(self, host, protocol, port, name=None, product=None, version=None, *, workspace=None):
+    # By the design of the api, we will disable too-many-arguments.
+    # This does not make the method complex or hard to understand.
+
+    def add_service(  # pylint: disable=R0913
+        self,
+        host,
+        protocol,
+        port,
+        *,
+        name=None,
+        product=None,
+        version=None,
+        workspace=None,
+    ):
         """Record or update an observed host service."""
         return self.database.add_service(
             workspace or self.workspace,
             host,
             protocol,
             port,
-            name,
-            product,
-            version,
+            name=name,
+            product=product,
+            version=version,
         )
 
     def list_services(self, host=None, *, workspace=None):

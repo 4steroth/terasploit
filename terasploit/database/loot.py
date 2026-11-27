@@ -55,7 +55,11 @@ class LootDatabase:
         """Return the current UTC timestamp."""
         return datetime.now(UTC).isoformat(timespec="seconds")
 
-    def add(
+    # By the design of the api, we will disable both too-many-arguments and too-many-locals
+    # since we need all this arguments to insert an artifact metadata to the database. This
+    # does not make the method complex, it simply needs all these arguments
+
+    def add(  # pylint: disable=R0913,R0914
         self,
         *,
         workspace,
