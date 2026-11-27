@@ -14,18 +14,17 @@ class GenericShell(BaseShell):
     def _handle_user_input(self, raw):
         """Intercept upload/download commands; pass everything else to BaseShell."""
         if not raw:
+            super()._handle_user_input(raw)
             return
 
-        parts = raw.split()
-        command = parts[0].lower()
-        args = parts[1:]
-
+        command = raw.split()[0].lower()
+        args = raw.split()
         if command == "upload":
-            self.cmd_upload(args)
-        elif command == "download":
-            self.cmd_download(args)
-        else:
-            super()._handle_user_input(raw)
+            self.cmd_upload(args[1:])
+        if command == "download":
+            self.cmd_download(args[1:])
+
+        super()._handle_user_input(raw)
 
     def cmd_upload(self, args):
         """Upload a local file to the target by piping Base64 through the shell."""
@@ -34,11 +33,9 @@ class GenericShell(BaseShell):
             return
 
         local_path, remote_path = args[0], args[1]
-
         if not os.path.isfile(local_path):
             error(f"Local file not found: {local_path}")
             return
-
         try:
             with open(local_path, "rb") as f:
                 binary_data = f.read()
@@ -51,7 +48,6 @@ class GenericShell(BaseShell):
 
             if self._send(cmd):
                 success(f"Upload dispatched → {remote_path}")
-
         except TerasploitShellError as exc:
             error(f"Failed to prepare upload: {exc}")
 
@@ -65,7 +61,6 @@ class GenericShell(BaseShell):
         local_path = args[1] if len(args) > 1 else os.path.basename(remote_path)
 
         info(f"Initiating download: {remote_path} → {local_path}")
-
         if not self._start_transfer(local_path):
             return
 
