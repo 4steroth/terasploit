@@ -81,3 +81,25 @@ def filter_compatible(module_paths, module_obj, category):
             compatible.append(dotted)
 
     return compatible
+
+
+def target_details(target):
+    """Return a target's ID, display name, and optional payload path."""
+    if not isinstance(target, (tuple, list)) or len(target) < 2:
+        raise ValueError(f"Invalid target definition: {target!r}")
+
+    target_id, metadata = target[:2]
+    payload = None
+    if isinstance(metadata, dict):
+        name = metadata.get("Name")
+        payload = metadata.get("Payload")
+    else:
+        name = metadata
+        if len(target) > 2:
+            payload = target[2]
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"Target {target_id!r} must define a non-empty Name")
+    if payload is not None and (not isinstance(payload, str) or not payload.strip()):
+        raise ValueError(f"Target {target_id!r} has an invalid Payload path")
+
+    return target_id, name, payload

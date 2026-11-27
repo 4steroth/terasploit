@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from terasploit.console.helpers import (
     category_of,
     filter_compatible,
+    target_details,
     to_path,
 )
 from terasploit.ui import tables as tbl
@@ -106,6 +107,7 @@ class ConsoleDisplay:
                 print_line("   (no options available for this module)\n")
             return
         if category_of(entry.name) == "exploit" and entry.module.OPTIONS:
+            # Add new line for better table spacing
             print_line()
         if definitions:
             tbl.options_table(
@@ -137,9 +139,13 @@ class ConsoleDisplay:
 
         current_target = self.console.datastore["TARGET"]
         for target in targets:
-            if current_target == target[1]:
+            try:
+                target_id, target_name, _ = target_details(target)
+            except ValueError:
+                continue
+            if current_target == target_name:
                 print_line()
-                tbl.targets_table(((target[0], target[1]),), title="Target")
+                tbl.targets_table(((target_id, target_name),), title="Target")
                 return
 
     def show_advanced(self):
@@ -273,6 +279,15 @@ class ConsoleDisplay:
         if not settings:
             warning(f"This {module_name} module does not declare any {title.lower()}")
             return
+        if attr == "TARGET":
+            normalized = []
+            for target in settings:
+                try:
+                    target_id, target_name, _ = target_details(target)
+                except ValueError:
+                    continue
+                normalized.append((target_id, target_name))
+            settings = normalized
 
         tbl.targets_table(settings, title=title)
 

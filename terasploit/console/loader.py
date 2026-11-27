@@ -1,6 +1,6 @@
 import dataclasses
 
-from terasploit.console.helpers import to_path
+from terasploit.console.helpers import target_details, to_path
 from terasploit.encoder.factory import EncoderFactory
 from terasploit.module.encoder import Encoder
 from terasploit.options.storage import (
@@ -183,8 +183,15 @@ class ConsoleLoader:
 
     def _apply_module_defaults(self, resolved: str, obj) -> None:
         """Applies default target/mode selection and auto-loads a payload."""
-        if resolved.startswith("exploit"):
-            self.console.datastore.set_value("TARGET", obj.TARGET[0][1], "module")
+        if resolved.startswith("exploit") and obj.TARGET:
+            try:
+                _, target_name, target_payload = target_details(obj.TARGET[0])
+            except ValueError as exc:
+                error(str(exc))
+                return
+            self.console.datastore.set_value("TARGET", target_name, "module")
+            if target_payload:
+                self._load_payload(target_payload, silent=True)
         if resolved.startswith("auxiliary"):
             self.console.datastore.set_value("AUXILIARY_MODE", obj.AUXILIARY_MODE[0][1], "module")
 
@@ -323,24 +330,24 @@ class ConsoleLoader:
             matches = self.console.modules.search(name)
             if not matches:
                 error(f"Payload not found: {raw!r}")
-                return
+                return False
             if len(matches) > 1:
                 warning(f"Ambiguous payload - {len(matches)} match(es):")
                 for match in matches[:8]:
                     print_line(f"   {to_path(match)}")
-                return
+                return False
 
             name = matches[0]
 
         mod = self.console.modules.load(name)
         if mod is None:
             error(f"Failed to load payload file: {name!r}")
-            return
+            return False
 
         cls = getattr(mod, "TerasploitModule", None)
         if cls is None:
             error(f"Payload {name!r} does not define a TerasploitModule class.")
-            return
+            return False
 
         obj = cls()
 
@@ -351,11 +358,12 @@ class ConsoleLoader:
                 error(f"Payload {to_path(name)} is incompatible with {to_path(module_entry.name)}:")
                 for reason in result.reasons:
                     print_line(f"   {RED}[-]{RESET} {reason}")
-                return
+                return False
 
         self._payload_options(name, obj)
         if not silent:
             print_line(f"PAYLOAD => {to_path(name)}")
+        return True
 
     def _payload_options(self, name, obj):
         """Register a payload's options into the datastore scopes."""
@@ -364,7 +372,6 @@ class ConsoleLoader:
         self.console.datastore.clear_scope("payload")
         self.console.datastore.clear_scope("payload_advanced")
         self.console.datastore.clear_scope("payload_evasion")
-
         if obj.OPTIONS:
             self.console.datastore.register("payload", _resolve_keys(obj.OPTIONS))
 
@@ -444,7 +451,6 @@ class ConsoleLoader:
 
         # Load all options to register in datastore.
         self._encoder_options(obj)
-
         if not silent:
             rank_label = getattr(obj.RANK, "label", lambda: str(obj.RANK))()
             arch_str = ", ".join(obj.ARCH) if obj.ARCH else "generic"
@@ -485,23 +491,59 @@ class ConsoleLoader:
         if not items:
             warning(f"This module does not declare any {no_items_label}.")
             return
+
+        item_id = self._parse_option_id(value, numeric_label)
+        if item_id is None:
+            return
+
+        selected = self._find_indexed_option(items, item_id, attr_name, double_space_quirk)
+        if selected is None:
+            return
+        if store_tuple_value:
+            self._select_target(item_id, selected, attr_name)
+            return
+
+        self.console.datastore.set_value(attr_name, item_id, "module")
+        print_line(f"{attr_name} => {item_id}  ({selected[1]})")
+
+    def _parse_option_id(self, value, numeric_label):
+        """Parse an indexed option ID."""
         try:
-            tid = int(value)
+            return int(value)
         except ValueError:
             error(f"{numeric_label} must be a numeric ID, got: {value!r}")
-            return
+            return None
 
-        valid_ids = [t[0] for t in items]
-        if tid not in valid_ids:
+    def _find_indexed_option(self, items, item_id, attr_name, double_space_quirk):
+        """Find an indexed option by ID."""
+        try:
+            return next(item for item in items if int(item[0]) == item_id)
+        except StopIteration, TypeError, ValueError, IndexError:
+            valid_ids = [item[0] for item in items]
             spacer = "  " if double_space_quirk else " "
-            error(f"Invalid {attr_name} ID {tid}.{spacer}Valid IDs: {valid_ids}")
+            error(f"Invalid {attr_name} ID {item_id}.{spacer}Valid IDs: {valid_ids}")
+            return None
+
+    def _select_target(self, item_id, selected, attr_name) -> None:
+        """Select a target and load its associated payload."""
+        try:
+            _, name, payload = target_details(selected)
+        except ValueError as exc:
+            error(str(exc))
             return
 
-        self.console.datastore.set_value(attr_name, items[tid][1] if store_tuple_value else tid, "module")
-        print_line(f"{attr_name} => {tid}  ({next(t[1] for t in items if t[0] == tid)})")
+        if payload and not self._load_payload(payload, silent=True):
+            warning(f"Target {item_id} was not selected because its payload could not be loaded.")
+            return
+
+        self.console.datastore.set_value(attr_name, name, "module")
+        print_line(f"{attr_name} => {item_id}  ({name})")
+
+        if payload:
+            print_line(f"PAYLOAD => {to_path(payload.replace('/', '.'))}")
 
     def _set_target(self, value):
-        """Select the active target by numeric ID."""
+        """Select a target and load its associated payload when defined."""
         self._select_indexed_option(
             value,
             ("TARGET", "TARGET", "targets", "TARGET", True, False),
